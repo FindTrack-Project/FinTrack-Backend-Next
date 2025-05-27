@@ -3,9 +3,9 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
-// Ini adalah fungsi helper CORS Anda, pastikan ini ada di atas
+// Fungsi helper CORS Anda (Biarkan ini tetap di atas)
 function addCorsHeaders(response: NextResponse) {
-  response.headers.set("Access-Control-Allow-Origin", "http://localhost:3000"); // Ganti jika port FE Anda berbeda
+  response.headers.set("Access-Control-Allow-Origin", "http://localhost:3000");
   response.headers.set(
     "Access-Control-Allow-Methods",
     "GET,POST,PUT,DELETE,OPTIONS"
@@ -18,26 +18,30 @@ function addCorsHeaders(response: NextResponse) {
   return response;
 }
 
-// Handler untuk Preflight OPTIONS requests (penting untuk CORS)
+// Handler untuk Preflight OPTIONS requests (Biarkan ini tetap ada)
 export async function OPTIONS() {
   const response = new NextResponse(null, { status: 204 });
   return addCorsHeaders(response);
 }
 
-// === Tambahkan definisi interface ini di atas fungsi GET/DELETE ===
-interface RouteParams {
-  id: string;
-}
-
-interface RouteContext {
-  params: RouteParams;
-}
+// ================================================================
+// HAPUS ATAU KOMENTARI DEFINISI INTERFACE INI:
+// interface RouteParams {
+//   id: string;
+// }
+// interface RouteContext {
+//   params: RouteParams;
+// }
 // ================================================================
 
 // GET /api/users/[id]
-export async function GET(request: Request, context: RouteContext) {
-  // Gunakan 'context: RouteContext'
-  const { id } = context.params; // Akses 'id' dari context.params
+// Ubah signature fungsi menjadi seperti ini:
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  // Perhatikan bagian ini!
+  const { id } = params; // Akses 'id' dari params secara langsung
   try {
     const user = await prisma.user.findUnique({
       where: { id },
@@ -67,9 +71,13 @@ export async function GET(request: Request, context: RouteContext) {
 }
 
 // DELETE /api/users/[id]
-export async function DELETE(request: Request, context: RouteContext) {
-  // Gunakan 'context: RouteContext'
-  const { id } = context.params; // Akses 'id' dari context.params
+// Ubah signature fungsi menjadi seperti ini juga:
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  // Perhatikan bagian ini!
+  const { id } = params; // Akses 'id' dari params secara langsung
   try {
     await prisma.user.delete({
       where: { id },
