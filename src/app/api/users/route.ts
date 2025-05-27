@@ -5,7 +5,7 @@ import prisma from "@/lib/prisma";
 // POST /api/users - Membuat user baru
 export async function POST(request: Request) {
   try {
-    const { name, email } = await request.json();
+    const { name, email, password } = await request.json();
 
     if (!email) {
       return NextResponse.json(
@@ -14,10 +14,18 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!password) {
+      return NextResponse.json(
+        { message: "Password is required" },
+        { status: 400 }
+      );
+    }
+
     const newUser = await prisma.user.create({
       data: {
         email,
         name,
+        password,
       },
     });
 
