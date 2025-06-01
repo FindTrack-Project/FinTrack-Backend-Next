@@ -1,8 +1,6 @@
-// app/api/predict-expense/route.ts
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma"; // Import default Prisma Client instance
 import { Expense, BudgetRecommendation } from "@prisma/client";
-
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -26,7 +24,7 @@ export async function POST(request: Request) {
     const expenses: Expense[] = await prisma.expense.findMany({
       where: {
         userId: userId,
-        type: "Pengeluaran",
+        // Hapus 'type: 'Pengeluaran'' karena model Expense tidak punya type lagi
         date: {
           gte: sixMonthsAgo,
           lt: startOfCurrentMonth,
@@ -61,7 +59,6 @@ export async function POST(request: Request) {
       last6MonthsData.push(monthlyExpensesMap.get(monthKey) || 0);
     }
 
-    // --- PENANGANAN JIKA DATA HISTORIS KOSONG ATAU MINIM ---
     const totalExpensesInPeriod = last6MonthsData.reduce(
       (sum, amount) => sum + amount,
       0
@@ -71,17 +68,15 @@ export async function POST(request: Request) {
       console.log(
         `No historical expenses found for user ${userId}. Returning a default budget.`
       );
-      // Anda bisa mengembalikan rekomendasi default atau pesan khusus
       return NextResponse.json(
         {
-          predicted_expense: 0, // Atau angka default lainnya, misal 500000
+          predicted_expense: 0,
           message: "No historical expenses found. Returning default budget.",
         },
         { status: 200 }
       );
     }
 
-    // Validasi final sebelum mengirim ke Flask ML API
     if (last6MonthsData.length !== 6) {
       console.error(
         "Error: Expected 6 months of data, but got:",
@@ -98,7 +93,6 @@ export async function POST(request: Request) {
 
     console.log("Sending to Flask ML API:", last6MonthsData);
 
-    // --- 2. Panggil API Flask ML Anda ---
     const flaskApiUrl =
       process.env.FLASK_API_URL || "http://localhost:5000/predict_expense";
 
@@ -110,7 +104,6 @@ export async function POST(request: Request) {
       body: JSON.stringify({ last_6_months_data: last6MonthsData }),
     });
 
-    // --- 3. Tangani Respons dari API Flask ---
     if (!flaskResponse.ok) {
       const errorData = await flaskResponse.json();
       console.error("Error from Flask API:", errorData);
@@ -120,7 +113,6 @@ export async function POST(request: Request) {
     const predictionData = await flaskResponse.json();
     const predictedExpense = predictionData.predicted_expense;
 
-    // --- 4. Opsional: Simpan Rekomendasi ke Database menggunakan Prisma ---
     if (predictedExpense !== undefined && predictedExpense !== null) {
       try {
         const nextMonth = new Date(

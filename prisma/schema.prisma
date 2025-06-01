@@ -1,4 +1,5 @@
 // prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,16 +11,24 @@ datasource db {
 
 // Model User yang sudah ada
 model User {
-  id                 String               @id @default(auto()) @map("_id") @db.ObjectId
-  email              String               @unique
-  name               String?
-  password           String
-  posts              Post[]
-  expenses           Expense[]            // <-- Tambahkan relasi ke Expenses
-  budgetRecommendations BudgetRecommendation[] // <-- Tambahkan relasi ke BudgetRecommendation
+  id                    String                 @id @default(auto()) @map("_id") @db.ObjectId
+  email                 String                 @unique
+  name                  String?
+  password              String
+  // Mengganti initialBalance menjadi currentBalance untuk merepresentasikan saldo terkini
+  // Saldo ini akan diperbarui setiap ada transaksi income atau expense
+  currentBalance        Float                  @default(0) 
+  
+  posts                 Post[]
+  expenses              Expense[]
+  incomes               Income[]               // Relasi ke Income
+  budgetRecommendations BudgetRecommendation[]
+  
+  createdAt             DateTime?              @default(now()) // <--- MODIFIKASI PENTING DI SINI
+  updatedAt             DateTime               @updatedAt
 }
 
-// Model Post yang sudah ada
+// Model Post yang sudah ada (tidak berubah)
 model Post {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   title     String
@@ -31,30 +40,42 @@ model Post {
   updatedAt DateTime @updatedAt
 }
 
-// --- Model Baru untuk Pengeluaran (Expense) ---
+// Model Expense (Modifikasi: 'type' dihapus karena sekarang ada model Income terpisah,
+//              'category' ditambahkan kembali jika Anda ingin mengkategorikan pengeluaran)
 model Expense {
-  id        String    @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String    @db.ObjectId // Foreign key ke User
-  user      User      @relation(fields: [userId], references: [id])
-  amount    Float
-  category  String    // Contoh: "Makanan", "Transportasi", "Hiburan"
-  type      String    // "Pengeluaran" atau "Pemasukan"
-  date      DateTime  @default(now()) // Tanggal transaksi
-  description String?  // Deskripsi opsional
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String    @db.ObjectId
+  user        User      @relation(fields: [userId], references: [id])
+  amount      Float
+  category    String    // Kategori pengeluaran (misal: "Makanan", "Transportasi", "Hiburan")
+  date        DateTime  @default(now()) // Default now() jika tidak disediakan
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
-// --- Model Baru untuk Rekomendasi Budget ---
-model BudgetRecommendation {
-  id        String    @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String    @db.ObjectId // Foreign key ke User
-  user      User      @relation(fields: [userId], references: [id])
-  month     DateTime  @unique @map("month_userId") // Menyimpan bulan sebagai awal bulan (misal: 2025-06-01T00:00:00Z)
-  amount    Float     // Jumlah rekomendasi budget
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+// Model Baru untuk Pemasukan (Income)
+model Income {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String    @db.ObjectId
+  user        User      @relation(fields: [userId], references: [id])
+  amount      Float
+  source      String    // Sumber pemasukan (misal: "Gaji", "Freelance", "Hadiah")
+  date        DateTime  @default(now()) // Default now() jika tidak disediakan
+  description String?
+  createdAt   DateTime? @default(now()) // Sudah benar di sini
+  updatedAt   DateTime  @updatedAt
+}
 
-  // Pastikan kombinasi month dan userId unik
-  @@unique([month, userId], name: "month_userId_unique")
+// Model BudgetRecommendation (tidak berubah)
+model BudgetRecommendation {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String    @db.ObjectId
+  user        User      @relation(fields: [userId], references: [id])
+  month       DateTime  // Ini harusnya hanya tanggal bulan (misal: 2025-06-01)
+  amount      Float
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([month, userId], name: "month_userId_unique") // Ensure unique budget per user per month
 }
