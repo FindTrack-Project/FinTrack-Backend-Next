@@ -1,13 +1,20 @@
-// src/lib/prisma.ts
 import { PrismaClient } from "@prisma/client";
+
+let prisma: PrismaClient;
 
 declare global {
   // eslint-disable-next-line no-var
   var prisma: PrismaClient | undefined;
 }
 
-const prisma = global.prisma || new PrismaClient();
-
-if (process.env.NODE_ENV === "development") global.prisma = prisma;
+if (process.env.NODE_ENV === "production") {
+  prisma = new PrismaClient();
+} else {
+  // Pastikan hanya ada satu instance PrismaClient di development
+  if (!global.prisma) {
+    global.prisma = new PrismaClient();
+  }
+  prisma = global.prisma;
+}
 
 export default prisma;

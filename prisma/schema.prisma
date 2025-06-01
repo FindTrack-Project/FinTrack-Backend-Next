@@ -8,14 +8,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Model User yang sudah ada
 model User {
-  id       String  @id @default(auto()) @map("_id") @db.ObjectId
-  email    String  @unique
-  name     String?
-  password String 
-  posts    Post[]
+  id                 String               @id @default(auto()) @map("_id") @db.ObjectId
+  email              String               @unique
+  name               String?
+  password           String
+  posts              Post[]
+  expenses           Expense[]            // <-- Tambahkan relasi ke Expenses
+  budgetRecommendations BudgetRecommendation[] // <-- Tambahkan relasi ke BudgetRecommendation
 }
 
+// Model Post yang sudah ada
 model Post {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   title     String
@@ -25,4 +29,32 @@ model Post {
   authorId  String   @db.ObjectId
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// --- Model Baru untuk Pengeluaran (Expense) ---
+model Expense {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String    @db.ObjectId // Foreign key ke User
+  user      User      @relation(fields: [userId], references: [id])
+  amount    Float
+  category  String    // Contoh: "Makanan", "Transportasi", "Hiburan"
+  type      String    // "Pengeluaran" atau "Pemasukan"
+  date      DateTime  @default(now()) // Tanggal transaksi
+  description String?  // Deskripsi opsional
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+// --- Model Baru untuk Rekomendasi Budget ---
+model BudgetRecommendation {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String    @db.ObjectId // Foreign key ke User
+  user      User      @relation(fields: [userId], references: [id])
+  month     DateTime  @unique @map("month_userId") // Menyimpan bulan sebagai awal bulan (misal: 2025-06-01T00:00:00Z)
+  amount    Float     // Jumlah rekomendasi budget
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Pastikan kombinasi month dan userId unik
+  @@unique([month, userId], name: "month_userId_unique")
 }

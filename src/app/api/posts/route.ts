@@ -1,8 +1,6 @@
-// src/app/api/posts/route.ts
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
-// POST /api/posts - Membuat post baru
 export async function POST(request: Request) {
   try {
     const { title, content, published, authorId } = await request.json();
