@@ -1,17 +1,14 @@
-// src/api/app/expenses/[expenseId]/route.ts
-
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
-// --- METHOD: PUT (Update Expense) ---
+// --- METHOD: PUT
 export async function PUT(
   req: Request,
   { params }: { params: { expenseId: string } }
 ) {
-  // 1. Verifikasi Token & Dapatkan userId
   const authHeader = req.headers.get("authorization");
   const token = authHeader?.split(" ")[1];
   if (!token) {
@@ -30,13 +27,11 @@ export async function PUT(
   const userIdFromToken = authResult.userId;
 
   try {
-    // PERBAIKAN: Await params seperti yang disarankan Next.js
     const awaitedParams = await params;
-    const { expenseId } = awaitedParams; // Destructure dari hasil await
+    const { expenseId } = awaitedParams;
 
     const { amount, date, description, category } = await req.json();
 
-    // 2. Validasi Input
     if (!expenseId) {
       return NextResponse.json(
         { message: "Expense ID is required." },
@@ -63,7 +58,6 @@ export async function PUT(
       );
     }
 
-    // 3. Cari Expense yang akan diupdate & Verifikasi Kepemilikan
     const existingExpense = await prisma.expense.findUnique({
       where: { id: expenseId },
     });
@@ -74,7 +68,6 @@ export async function PUT(
         { status: 404 }
       );
     }
-    // Otorisasi: Pastikan expense ini milik user yang terotentikasi
     if (existingExpense.userId !== userIdFromToken) {
       return NextResponse.json(
         { message: "Unauthorized: You do not own this expense." },
@@ -82,7 +75,6 @@ export async function PUT(
       );
     }
 
-    // 4. Perbarui currentBalance Pengguna
     const user = await prisma.user.findUnique({
       where: { id: userIdFromToken },
       select: { currentBalance: true },
@@ -93,7 +85,22 @@ export async function PUT(
     }
 
     const oldAmount = existingExpense.amount;
-    const amountDifference = amount - oldAmount;
+    const amountDifference = amount - oldAmount; // Selisih baru - lama
+
+    // --- VALIDASI BARU: Cek Saldo Tidak Cukup untuk Update ---
+    // Jika amountDifference positif (jumlah pengeluaran bertambah), cek apakah saldo mencukupi
+    if (amountDifference > 0 && user.currentBalance - amountDifference < 0) {
+      return NextResponse.json(
+        {
+          message: "Insufficient balance to increase expense amount.",
+          currentBalance: user.currentBalance,
+          increaseAmount: amountDifference,
+        },
+        { status: 400 }
+      );
+    }
+    // --- AKHIR VALIDASI BARU ---
+
     const updatedBalance = user.currentBalance - amountDifference;
 
     await prisma.user.update({
@@ -101,7 +108,6 @@ export async function PUT(
       data: { currentBalance: updatedBalance },
     });
 
-    // 5. Perbarui Expense
     const updatedExpense = await prisma.expense.update({
       where: { id: expenseId },
       data: {
