@@ -2,12 +2,22 @@
 
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { verifyToken } from "@/lib/auth"; // Import utilitas verifikasi JWT
 
 const prisma = new PrismaClient();
 
 export async function POST(req: Request) {
+  // Verifikasi Token
+  const authHeader = req.headers.get("authorization");
+  const token = authHeader?.split(" ")[1]; // Expecting "Bearer <token>"
+  const authResult = token ? verifyToken(token) : null;
+  if (!authResult || !authResult.userId) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+  const userId = authResult.userId; // Dapatkan userId dari token!
+
   try {
-    const { amount, date, description, userId, category } = await req.json();
+    const { amount, date, description, category } = await req.json(); // userId TIDAK perlu dari body lagi
 
     // 1. Validasi Input
     if (typeof amount !== "number" || isNaN(amount) || amount <= 0) {
@@ -16,9 +26,10 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    if (!date || !userId || !category) {
+    if (!date || !category) {
+      // userId sudah ada dari token
       return NextResponse.json(
-        { message: "Missing required fields: date, userId, category" },
+        { message: "Missing required fields: date, category" },
         { status: 400 }
       );
     }
@@ -33,11 +44,12 @@ export async function POST(req: Request) {
 
     // 2. Cek apakah user ada dan dapatkan saldo saat ini
     const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { currentBalance: true }, // Hanya ambil balance
+      where: { id: userId }, // Gunakan userId dari token
+      select: { currentBalance: true },
     });
 
     if (!user) {
+      // Ini seharusnya jarang terjadi jika token valid, kecuali user dihapus setelah login
       return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
 
@@ -47,7 +59,7 @@ export async function POST(req: Request) {
         amount: amount,
         date: parsedDate,
         description: description || null,
-        userId: userId,
+        userId: userId, // Gunakan userId dari token
         category: category,
       },
     });
@@ -56,7 +68,7 @@ export async function POST(req: Request) {
     const updatedBalance = user.currentBalance - amount;
 
     await prisma.user.update({
-      where: { id: userId },
+      where: { id: userId }, // Gunakan userId dari token
       data: {
         currentBalance: updatedBalance,
       },
@@ -87,23 +99,25 @@ export async function POST(req: Request) {
   }
 }
 
-// Opsional: GET semua pengeluaran untuk user tertentu
 export async function GET(req: Request) {
-  try {
-    // Ambil userId dari query params, misalnya /api/app/expenses?userId=YOUR_USER_ID
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId");
+  // Verifikasi Token
+  const authHeader = req.headers.get("authorization");
+  const token = authHeader?.split(" ")[1]; // Expecting "Bearer <token>"
+  const authResult = token ? verifyToken(token) : null;
+  if (!authResult || !authResult.userId) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+  const userId = authResult.userId; // Dapatkan userId dari token!
 
-    if (!userId) {
-      return NextResponse.json(
-        { message: "User ID is required" },
-        { status: 400 }
-      );
-    }
+  try {
+    // Ambil userId dari token, bukan dari query params
+    // Anda bisa hapus pengambilan userId dari searchParams jika tidak diperlukan lagi
+    // const { searchParams } = new URL(req.url);
+    // const userId = searchParams.get('userId'); // TIDAK PERLU INI LAGI
 
     const expenses = await prisma.expense.findMany({
-      where: { userId: userId },
-      orderBy: { date: "desc" }, // Urutkan berdasarkan tanggal terbaru
+      where: { userId: userId }, // Gunakan userId dari token
+      orderBy: { date: "desc" },
     });
 
     return NextResponse.json({ expenses }, { status: 200 });

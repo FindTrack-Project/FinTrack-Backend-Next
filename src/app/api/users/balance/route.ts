@@ -1,4 +1,4 @@
-// src/api/app/users/[userId]/route.ts
+// src/api/app/users/balance/route.ts (Lokasi BARU, tanpa [userId] di nama folder)
 
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
@@ -6,10 +6,8 @@ import { verifyToken } from "@/lib/auth"; // Import utilitas verifikasi JWT
 
 const prisma = new PrismaClient();
 
-export async function GET(
-  req: Request,
-  { params }: { params: { userId: string } }
-) {
+export async function GET(req: Request) {
+  // Tidak ada { params } lagi
   // Verifikasi Token
   const authHeader = req.headers.get("authorization");
   const token = authHeader?.startsWith("Bearer ")
@@ -19,38 +17,22 @@ export async function GET(
   if (!authResult || !authResult.userId) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
-  const userIdFromToken = authResult.userId; // Dapatkan userId dari token!
+  const userId = authResult.userId; // Dapatkan userId dari token!
 
   try {
-    const { userId } = params; // Dapatkan userId dari URL parameter
-
+    // userId sekarang diambil dari token, bukan dari URL params
     if (!userId) {
+      // Ini seharusnya tidak terjadi jika verifyToken sukses
       return NextResponse.json(
-        { message: "User ID is required" },
+        { message: "User ID not found in token" },
         { status: 400 }
       );
     }
 
-    // Otorisasi: Pastikan userId dari URL cocok dengan userId dari token
-    if (userId !== userIdFromToken) {
-      return NextResponse.json(
-        {
-          message:
-            "Unauthorized access: Token does not match requested user ID",
-        },
-        { status: 403 }
-      ); // Forbidden
-    }
-
     const user = await prisma.user.findUnique({
-      where: { id: userId }, // Gunakan userId dari URL/Token (karena sudah diverifikasi)
+      where: { id: userId }, // Gunakan userId dari token
       select: {
-        id: true,
-        email: true,
-        name: true,
         currentBalance: true,
-        createdAt: true,
-        updatedAt: true,
       },
     });
 
@@ -58,12 +40,15 @@ export async function GET(
       return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ user }, { status: 200 });
+    return NextResponse.json(
+      { currentBalance: user.currentBalance },
+      { status: 200 }
+    );
   } catch (error: unknown) {
-    console.error("Error fetching user details:", error);
+    console.error("Error fetching user balance:", error);
     return NextResponse.json(
       {
-        message: "Failed to fetch user details",
+        message: "Failed to fetch user balance",
         error:
           error instanceof Error
             ? error.message

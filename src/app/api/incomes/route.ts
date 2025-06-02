@@ -2,12 +2,28 @@
 
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { verifyToken } from "@/lib/auth"; // Import utilitas verifikasi JWT
 
 const prisma = new PrismaClient();
 
 export async function POST(req: Request) {
+  // Verifikasi Token
+  const authHeader = req.headers.get("authorization");
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : authHeader || "";
+  const authResult = verifyToken(token);
+  if (
+    !authResult ||
+    typeof authResult !== "object" ||
+    !("userId" in authResult)
+  ) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+  const userId = (authResult as { userId: string }).userId; // Dapatkan userId dari token!
+
   try {
-    const { amount, date, description, userId, source } = await req.json();
+    const { amount, date, description, source } = await req.json(); // userId TIDAK perlu dari body lagi
 
     // 1. Validasi Input
     if (typeof amount !== "number" || isNaN(amount) || amount <= 0) {
@@ -16,9 +32,10 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    if (!date || !userId || !source) {
+    if (!date || !source) {
+      // userId sudah ada dari token
       return NextResponse.json(
-        { message: "Missing required fields: date, userId, source" },
+        { message: "Missing required fields: date, source" },
         { status: 400 }
       );
     }
@@ -33,11 +50,12 @@ export async function POST(req: Request) {
 
     // 2. Cek apakah user ada dan dapatkan saldo saat ini
     const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { currentBalance: true }, // Hanya ambil balance
+      where: { id: userId }, // Gunakan userId dari token
+      select: { currentBalance: true },
     });
 
     if (!user) {
+      // Ini seharusnya jarang terjadi jika token valid
       return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
 
@@ -47,7 +65,7 @@ export async function POST(req: Request) {
         amount: amount,
         date: parsedDate,
         description: description || null,
-        userId: userId,
+        userId: userId, // Gunakan userId dari token
         source: source,
       },
     });
@@ -56,7 +74,7 @@ export async function POST(req: Request) {
     const updatedBalance = user.currentBalance + amount;
 
     await prisma.user.update({
-      where: { id: userId },
+      where: { id: userId }, // Gunakan userId dari token
       data: {
         currentBalance: updatedBalance,
       },
@@ -87,22 +105,27 @@ export async function POST(req: Request) {
   }
 }
 
-// Opsional: GET semua pemasukan untuk user tertentu
 export async function GET(req: Request) {
+  // Extract token from Authorization header
+  const authHeader = req.headers.get("authorization");
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : authHeader || "";
+  const authResult = verifyToken(token);
+  if (
+    !authResult ||
+    typeof authResult !== "object" ||
+    !("userId" in authResult)
+  ) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+  const userId = (authResult as { userId: string }).userId; // Dapatkan userId dari token!
+
   try {
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId");
-
-    if (!userId) {
-      return NextResponse.json(
-        { message: "User ID is required" },
-        { status: 400 }
-      );
-    }
-
+    // Ambil userId dari token, bukan dari query params
     const incomes = await prisma.income.findMany({
-      where: { userId: userId },
-      orderBy: { date: "desc" }, // Urutkan berdasarkan tanggal terbaru
+      where: { userId: userId }, // Gunakan userId dari token
+      orderBy: { date: "desc" },
     });
 
     return NextResponse.json({ incomes }, { status: 200 });

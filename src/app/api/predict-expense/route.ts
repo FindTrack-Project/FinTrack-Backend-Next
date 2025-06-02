@@ -1,30 +1,33 @@
+// src/api/app/predict-expense/route.ts
+
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma"; // Import default Prisma Client instance
-import { Expense, BudgetRecommendation } from "@prisma/client";
+import prisma from "@/lib/prisma";
+import { verifyToken } from "@/lib/auth";
+
 export async function POST(request: Request) {
+  const authHeader = request.headers.get("authorization");
+  const token = authHeader?.split(" ")[1] || "";
+  const authResult = verifyToken(token);
+  if (!authResult) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = authResult.userId;
+
   try {
-    const body = await request.json();
-    const { userId } = body;
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: "User ID is required." },
-        { status: 400 }
-      );
-    }
-
     const today = new Date();
     const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 6, 1);
+    sixMonthsAgo.setHours(0, 0, 0, 0);
+
     const startOfCurrentMonth = new Date(
       today.getFullYear(),
       today.getMonth(),
       1
     );
+    startOfCurrentMonth.setHours(0, 0, 0, 0);
 
-    const expenses: Expense[] = await prisma.expense.findMany({
+    const expenses = await prisma.expense.findMany({
       where: {
         userId: userId,
-        // Hapus 'type: 'Pengeluaran'' karena model Expense tidak punya type lagi
         date: {
           gte: sixMonthsAgo,
           lt: startOfCurrentMonth,
@@ -36,7 +39,7 @@ export async function POST(request: Request) {
     });
 
     const monthlyExpensesMap = new Map<string, number>();
-    expenses.forEach((expense: Expense) => {
+    expenses.forEach((expense) => {
       const monthKey = `${expense.date.getFullYear()}-${(
         expense.date.getMonth() + 1
       )
@@ -66,12 +69,13 @@ export async function POST(request: Request) {
 
     if (totalExpensesInPeriod === 0) {
       console.log(
-        `No historical expenses found for user ${userId}. Returning a default budget.`
+        `No historical expenses found for user ${userId} in the last 6 months. Returning a default budget.`
       );
       return NextResponse.json(
         {
           predicted_expense: 0,
-          message: "No historical expenses found. Returning default budget.",
+          message:
+            "No historical expenses found for prediction. Returning default budget.",
         },
         { status: 200 }
       );
@@ -79,19 +83,19 @@ export async function POST(request: Request) {
 
     if (last6MonthsData.length !== 6) {
       console.error(
-        "Error: Expected 6 months of data, but got:",
+        "Error: Expected 6 months of data for ML model, but got:",
         last6MonthsData.length
       );
       return NextResponse.json(
         {
           error:
-            "Failed to retrieve sufficient historical data for prediction.",
+            "Failed to retrieve sufficient historical data for prediction (expected 6 months).",
         },
         { status: 500 }
       );
     }
 
-    console.log("Sending to Flask ML API:", last6MonthsData);
+    console.log(`Sending to Flask ML API for user ${userId}:`, last6MonthsData);
 
     const flaskApiUrl =
       process.env.FLASK_API_URL || "http://localhost:5000/predict_expense";
@@ -122,15 +126,14 @@ export async function POST(request: Request) {
         );
         nextMonth.setHours(0, 0, 0, 0);
 
-        const existingBudget: BudgetRecommendation | null =
-          await prisma.budgetRecommendation.findUnique({
-            where: {
-              month_userId_unique: {
-                month: nextMonth,
-                userId: userId,
-              },
+        const existingBudget = await prisma.budgetRecommendation.findUnique({
+          where: {
+            month_userId_unique: {
+              month: nextMonth,
+              userId: userId,
             },
-          });
+          },
+        });
 
         if (existingBudget) {
           await prisma.budgetRecommendation.update({
@@ -169,11 +172,16 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(predictionData, { status: 200 });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error in predict-expense API route:", error);
     return NextResponse.json(
-      { error: "Internal server error: Failed to process request." },
+      {
+        error: "Internal server error: Failed to process request.",
+        details: error instanceof Error ? error.message : "No details",
+      },
       { status: 500 }
     );
+  } finally {
+    await prisma.$disconnect();
   }
 }
