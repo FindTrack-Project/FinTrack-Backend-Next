@@ -1,62 +1,62 @@
+// src/api/app/saving-goals/[goalId]/allocate/route.ts
+
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
+import { withCORS, handleCORSPreflight } from "@/lib/cors"; // Import helper CORS
 
 const prisma = new PrismaClient();
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
-
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: CORS_HEADERS, status: 200 });
-}
-
+// --- METHOD: POST (Allocate Funds to Saving Goal) ---
 export async function POST(
   req: Request,
   { params }: { params: { goalId: string } }
 ) {
-  const authHeader = req.headers.get("authorization");
+  const authHeader =
+    req.headers.get("authorization") || req.headers.get("Authorization");
   const token = authHeader?.startsWith("Bearer ")
     ? authHeader.slice(7)
     : authHeader || "";
-  const payload = verifyToken(token);
-  if (!payload) {
-    return NextResponse.json(
-      { message: "Invalid or missing token." },
-      { status: 401, headers: CORS_HEADERS }
+  const authResult = verifyToken(token);
+  if (!authResult || !authResult.userId) {
+    const response = NextResponse.json(
+      { message: "Invalid or missing authentication token." },
+      { status: 401 }
     );
+    return withCORS(response, ["POST"], ["Content-Type", "Authorization"]);
   }
-  const userIdFromToken = payload.userId;
+  const userIdFromToken = authResult.userId;
 
   try {
-    const awaitedParams = await params;
-    const { goalId } = awaitedParams;
+    // PERBAIKAN: Hapus 'await' pada params
+    // const awaitedParams = await params;
+    const { goalId } = params; // Langsung destructure dari params
 
     const { amount, accountId } = await req.json();
 
     if (!goalId) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { message: "Saving Goal ID is required." },
-        { status: 400, headers: CORS_HEADERS }
+        { status: 400 }
       );
+      return withCORS(response, ["POST"], ["Content-Type", "Authorization"]);
     }
     if (!accountId) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { message: "Source Account ID is required." },
-        { status: 400, headers: CORS_HEADERS }
+        { status: 400 }
       );
+      return withCORS(response, ["POST"], ["Content-Type", "Authorization"]);
     }
     if (typeof amount !== "number" || isNaN(amount) || amount <= 0) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         {
           message:
             "Allocation amount is required and must be a positive number.",
         },
-        { status: 400, headers: CORS_HEADERS }
+        { status: 400 }
       );
+      return withCORS(response, ["POST"], ["Content-Type", "Authorization"]);
     }
 
     const savingGoal = await prisma.savingGoal.findUnique({
@@ -64,28 +64,31 @@ export async function POST(
     });
 
     if (!savingGoal) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { message: "Saving Goal not found." },
-        { status: 404, headers: CORS_HEADERS }
+        { status: 404 }
       );
+      return withCORS(response, ["POST"], ["Content-Type", "Authorization"]);
     }
     if (savingGoal.userId !== userIdFromToken) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { message: "Unauthorized: You do not own this saving goal." },
-        { status: 403, headers: CORS_HEADERS }
+        { status: 403 }
       );
+      return withCORS(response, ["POST"], ["Content-Type", "Authorization"]);
     }
     if (savingGoal.isCompleted) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         {
           message:
             "Saving Goal is already completed. Cannot allocate more funds.",
         },
-        { status: 400, headers: CORS_HEADERS }
+        { status: 400 }
       );
+      return withCORS(response, ["POST"], ["Content-Type", "Authorization"]);
     }
     if (savingGoal.currentSavedAmount + amount > savingGoal.targetAmount) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         {
           message: `Allocation amount exceeds the remaining target for '${
             savingGoal.name
@@ -95,8 +98,9 @@ export async function POST(
           remainingTarget:
             savingGoal.targetAmount - savingGoal.currentSavedAmount,
         },
-        { status: 400, headers: CORS_HEADERS }
+        { status: 400 }
       );
+      return withCORS(response, ["POST"], ["Content-Type", "Authorization"]);
     }
 
     const sourceAccount = await prisma.account.findUnique({
@@ -104,26 +108,29 @@ export async function POST(
     });
 
     if (!sourceAccount) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { message: "Source Account not found." },
-        { status: 404, headers: CORS_HEADERS }
+        { status: 404 }
       );
+      return withCORS(response, ["POST"], ["Content-Type", "Authorization"]);
     }
     if (sourceAccount.userId !== userIdFromToken) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { message: "Unauthorized: Source account does not belong to you." },
-        { status: 403, headers: CORS_HEADERS }
+        { status: 403 }
       );
+      return withCORS(response, ["POST"], ["Content-Type", "Authorization"]);
     }
     if (sourceAccount.currentBalance < amount) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         {
           message: `Insufficient balance in source account '${sourceAccount.name}'. Available: ${sourceAccount.currentBalance}.`,
           accountBalance: sourceAccount.currentBalance,
           allocationAmount: amount,
         },
-        { status: 400, headers: CORS_HEADERS }
+        { status: 400 }
       );
+      return withCORS(response, ["POST"], ["Content-Type", "Authorization"]);
     }
 
     const [updatedSourceAccount, updatedSavingGoal] = await prisma.$transaction(
@@ -143,28 +150,35 @@ export async function POST(
       ]
     );
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         message: `Successfully allocated ${amount} from '${updatedSourceAccount.name}' to '${updatedSavingGoal.name}'.`,
         updatedSourceAccountBalance: updatedSourceAccount.currentBalance,
         updatedSavingGoalAmount: updatedSavingGoal.currentSavedAmount,
         isGoalCompleted: updatedSavingGoal.isCompleted,
       },
-      { status: 200, headers: CORS_HEADERS }
+      { status: 200 }
     );
+
+    return withCORS(response, ["POST"], ["Content-Type", "Authorization"]);
   } catch (error: unknown) {
     console.error("Error allocating funds to saving goal:", error);
-    return NextResponse.json(
+    const errorMessage =
+      error instanceof Error ? error.message : "An unexpected error occurred.";
+    const errorResponse = NextResponse.json(
       {
         message: "Failed to allocate funds to saving goal.",
-        error:
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred.",
+        error: errorMessage,
       },
-      { status: 500, headers: CORS_HEADERS }
+      { status: 500 }
     );
+    return withCORS(errorResponse, ["POST"], ["Content-Type", "Authorization"]);
   } finally {
     await prisma.$disconnect();
   }
+}
+
+// Handle OPTIONS requests for CORS preflight
+export async function OPTIONS() {
+  return handleCORSPreflight(["POST"], ["Content-Type", "Authorization"]);
 }

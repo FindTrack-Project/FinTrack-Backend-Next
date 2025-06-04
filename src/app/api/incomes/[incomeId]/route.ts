@@ -1,69 +1,85 @@
+// src/api/app/incomes/[incomeId]/route.ts
+
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
+import { withCORS, handleCORSPreflight } from "@/lib/cors"; // Import helper CORS
 
 const prisma = new PrismaClient();
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
-
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: CORS_HEADERS, status: 200 });
-}
-
+// --- METHOD: PUT (Update Income) ---
 export async function PUT(
   req: Request,
   { params }: { params: { incomeId: string } }
 ) {
   const authHeader = req.headers.get("authorization");
-  const token = authHeader?.split(" ")[1];
-  if (!token) {
-    return NextResponse.json(
-      { message: "Authorization token missing." },
-      { status: 401, headers: CORS_HEADERS }
-    );
-  }
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : authHeader || "";
   const authResult = verifyToken(token);
   if (!authResult || !authResult.userId) {
-    return NextResponse.json(
-      { message: "Invalid or expired token." },
-      { status: 401, headers: CORS_HEADERS }
+    const response = NextResponse.json(
+      { message: "Unauthorized: Invalid or missing token." },
+      { status: 401 }
+    );
+    return withCORS(
+      response,
+      ["PUT", "DELETE"],
+      ["Content-Type", "Authorization"]
     );
   }
   const userIdFromToken = authResult.userId;
 
   try {
-    const awaitedParams = await params;
-    const { incomeId } = awaitedParams;
+    // PERBAIKAN: Hapus 'await' pada params
+    // const awaitedParams = await params;
+    const { incomeId } = params; // Langsung destructure dari params
 
     const { amount, date, description, source } = await req.json();
 
     if (!incomeId) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { message: "Income ID is required." },
-        { status: 400, headers: CORS_HEADERS }
+        { status: 400 }
+      );
+      return withCORS(
+        response,
+        ["PUT", "DELETE"],
+        ["Content-Type", "Authorization"]
       );
     }
     if (typeof amount !== "number" || isNaN(amount) || amount <= 0) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { message: "Invalid amount. Must be a positive number." },
-        { status: 400, headers: CORS_HEADERS }
+        { status: 400 }
+      );
+      return withCORS(
+        response,
+        ["PUT", "DELETE"],
+        ["Content-Type", "Authorization"]
       );
     }
     if (!date || !source) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { message: "Missing required fields: date, source." },
-        { status: 400, headers: CORS_HEADERS }
+        { status: 400 }
+      );
+      return withCORS(
+        response,
+        ["PUT", "DELETE"],
+        ["Content-Type", "Authorization"]
       );
     }
     const parsedDate = new Date(date);
     if (isNaN(parsedDate.getTime())) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { message: "Invalid date format." },
-        { status: 400, headers: CORS_HEADERS }
+        { status: 400 }
+      );
+      return withCORS(
+        response,
+        ["PUT", "DELETE"],
+        ["Content-Type", "Authorization"]
       );
     }
 
@@ -73,15 +89,25 @@ export async function PUT(
     });
 
     if (!existingIncome) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { message: "Income not found." },
-        { status: 404, headers: CORS_HEADERS }
+        { status: 404 }
+      );
+      return withCORS(
+        response,
+        ["PUT", "DELETE"],
+        ["Content-Type", "Authorization"]
       );
     }
     if (existingIncome.userId !== userIdFromToken) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { message: "Unauthorized: You do not own this income." },
-        { status: 403, headers: CORS_HEADERS }
+        { status: 403 }
+      );
+      return withCORS(
+        response,
+        ["PUT", "DELETE"],
+        ["Content-Type", "Authorization"]
       );
     }
 
@@ -91,9 +117,14 @@ export async function PUT(
     });
 
     if (!account) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { message: "Associated account not found." },
-        { status: 404, headers: CORS_HEADERS }
+        { status: 404 }
+      );
+      return withCORS(
+        response,
+        ["PUT", "DELETE"],
+        ["Content-Type", "Authorization"]
       );
     }
 
@@ -116,61 +147,78 @@ export async function PUT(
       },
     });
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         message: "Income updated successfully and account balance adjusted.",
         income: updatedIncome,
         newAccountBalance: updatedAccountBalance,
       },
-      { status: 200, headers: CORS_HEADERS }
+      { status: 200 }
+    );
+
+    return withCORS(
+      response,
+      ["PUT", "DELETE"],
+      ["Content-Type", "Authorization"]
     );
   } catch (error: unknown) {
     console.error("Error updating income:", error);
-    let errorMessage = "An unexpected error occurred.";
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    }
-    return NextResponse.json(
+    const errorMessage =
+      error instanceof Error ? error.message : "An unexpected error occurred.";
+    const errorResponse = NextResponse.json(
       {
         message: "Failed to update income.",
         error: errorMessage,
       },
-      { status: 500, headers: CORS_HEADERS }
+      { status: 500 }
+    );
+    return withCORS(
+      errorResponse,
+      ["PUT", "DELETE"],
+      ["Content-Type", "Authorization"]
     );
   } finally {
     await prisma.$disconnect();
   }
 }
 
+// --- METHOD: DELETE (Delete Income) ---
 export async function DELETE(
   req: Request,
   { params }: { params: { incomeId: string } }
 ) {
   const authHeader = req.headers.get("authorization");
-  const token = authHeader?.split(" ")[1];
-  if (!token) {
-    return NextResponse.json(
-      { message: "Authorization token missing." },
-      { status: 401, headers: CORS_HEADERS }
-    );
-  }
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : authHeader || "";
   const authResult = verifyToken(token);
   if (!authResult || !authResult.userId) {
-    return NextResponse.json(
-      { message: "Invalid or expired token." },
-      { status: 401, headers: CORS_HEADERS }
+    const response = NextResponse.json(
+      { message: "Unauthorized: Invalid or missing token." },
+      { status: 401 }
+    );
+    return withCORS(
+      response,
+      ["PUT", "DELETE"],
+      ["Content-Type", "Authorization"]
     );
   }
   const userIdFromToken = authResult.userId;
 
   try {
-    const awaitedParams = await params;
-    const { incomeId } = awaitedParams;
+    // PERBAIKAN: Hapus 'await' pada params
+    // const awaitedParams = await params;
+    const { incomeId } = params; // Langsung destructure dari params
 
     if (!incomeId) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { message: "Income ID is required." },
-        { status: 400, headers: CORS_HEADERS }
+        { status: 400 }
+      );
+      return withCORS(
+        response,
+        ["PUT", "DELETE"],
+        ["Content-Type", "Authorization"]
       );
     }
 
@@ -180,15 +228,25 @@ export async function DELETE(
     });
 
     if (!existingIncome) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { message: "Income not found." },
-        { status: 404, headers: CORS_HEADERS }
+        { status: 404 }
+      );
+      return withCORS(
+        response,
+        ["PUT", "DELETE"],
+        ["Content-Type", "Authorization"]
       );
     }
     if (existingIncome.userId !== userIdFromToken) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { message: "Unauthorized: You do not own this income." },
-        { status: 403, headers: CORS_HEADERS }
+        { status: 403 }
+      );
+      return withCORS(
+        response,
+        ["PUT", "DELETE"],
+        ["Content-Type", "Authorization"]
       );
     }
 
@@ -198,9 +256,14 @@ export async function DELETE(
     });
 
     if (!account) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { message: "Associated account not found." },
-        { status: 404, headers: CORS_HEADERS }
+        { status: 404 }
+      );
+      return withCORS(
+        response,
+        ["PUT", "DELETE"],
+        ["Content-Type", "Authorization"]
       );
     }
 
@@ -216,27 +279,44 @@ export async function DELETE(
       data: { currentBalance: updatedAccountBalance },
     });
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
-        message: "Income deleted successfully and account balance adjusted.",
+        message: "Income deleted successfully and balance adjusted.",
         newAccountBalance: updatedAccountBalance,
       },
-      { status: 200, headers: CORS_HEADERS }
+      { status: 200 }
+    );
+
+    return withCORS(
+      response,
+      ["PUT", "DELETE"],
+      ["Content-Type", "Authorization"]
     );
   } catch (error: unknown) {
     console.error("Error deleting income:", error);
-    let errorMessage = "An unexpected error occurred.";
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    }
-    return NextResponse.json(
+    const errorMessage =
+      error instanceof Error ? error.message : "An unexpected error occurred.";
+    const errorResponse = NextResponse.json(
       {
         message: "Failed to delete income.",
         error: errorMessage,
       },
-      { status: 500, headers: CORS_HEADERS }
+      { status: 500 }
+    );
+    return withCORS(
+      errorResponse,
+      ["PUT", "DELETE"],
+      ["Content-Type", "Authorization"]
     );
   } finally {
     await prisma.$disconnect();
   }
+}
+
+// Handle OPTIONS requests for CORS preflight
+export async function OPTIONS() {
+  return handleCORSPreflight(
+    ["PUT", "DELETE"],
+    ["Content-Type", "Authorization"]
+  );
 }
