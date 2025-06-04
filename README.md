@@ -26,75 +26,10 @@ Fintrack Backend API adalah tulang punggung aplikasi manajemen keuangan pribadi 
 - **Autentikasi**: JWT (jsonwebtoken), bcryptjs
 - **Integrasi ML**: Interaksi dengan Flask API eksternal (membutuhkan Flask API terpisah untuk fitur prediksi)
 
-## Setup Proyek Lokal
-
-Ikuti langkah-langkah di bawah ini untuk menjalankan proyek Fintrack Backend API di lingkungan lokal Anda.
-
-### 1. Klon Repository
-
-```bash
-git clone https://github.com/your-username/Fintrack-Backend.git # Ganti dengan URL repo Anda
-cd Fintrack-Backend
-```
-
-### 2. Instal Dependensi
-
-Instal semua paket yang diperlukan menggunakan npm atau yarn:
-
-```bash
-npm install
-# atau
-yarn install
-```
-
-### 3. Konfigurasi Environment Variables
-
-Buat file `.env` di root proyek Anda (`Fintrack-Backend/`) dan tambahkan variabel lingkungan berikut:
-
-```env
-DATABASE_URL="mongodb+srv://<username>:<password>@<cluster-url>/Fintrack-nextjs?retryWrites=true&w=majority"
-JWT_SECRET="YOUR_VERY_STRONG_AND_RANDOM_JWT_SECRET_KEY_HERE"
-FLASK_API_URL="http://localhost:5000/predict_expense" # Ganti jika Flask API Anda di URL lain
-```
-
-- Ganti `<username>`, `<password>`, dan `<cluster-url>` dengan kredensial database MongoDB Anda
-- Ganti `YOUR_VERY_STRONG_AND_RANDOM_JWT_SECRET_KEY_HERE` dengan string acak yang panjang dan kompleks. Anda bisa menggunakan generator string acak online atau `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` di terminal
-
-### 4. Setup Prisma dan Database
-
-Pastikan skema database Prisma Anda sudah benar. Proyek ini menggunakan model `User`, `Account`, `Expense`, `Income`, `Post`, dan `BudgetRecommendation`.
-
-**Generasi Prisma Client:**
-Setelah mengatur `.env` dan menginstal dependensi, generate Prisma Client untuk memastikan tipenya selaras dengan skema Anda:
-
-```bash
-npx prisma generate
-```
-
-> **Catatan**: Karena menggunakan MongoDB, Prisma tidak memerlukan `migrate dev`. Perubahan skema langsung diterapkan saat operasi data dilakukan atau setelah generate.
-
-**Pembersihan Data Awal (Opsional tapi Direkomendasikan):**
-Jika Anda ingin memulai dengan data keuangan yang bersih (tetapi mempertahankan data pengguna), Anda bisa menjalankan script pembersih:
-
-1. Buat file `scripts/clear-financial-data.ts` di root proyek
-2. Isi dengan kode dari sesi kita sebelumnya
-3. Jalankan `npx tsc scripts/clear-financial-data.ts` lalu `node scripts/clear-financial-data.js`
-
-### 5. Menjalankan Server Pengembangan
-
-Mulai server Next.js dalam mode pengembangan:
-
-```bash
-npm run dev
-# atau
-yarn dev
-```
-
-API Anda akan berjalan di `http://localhost:3000` (atau port lain yang dikonfigurasi oleh Next.js).
 
 ## Dokumentasi API Endpoints
 
-Semua endpoint API Anda berada di bawah Base URL `http://localhost:3000/api`.
+Semua endpoint API Anda berada di bawah Base URL `https://fintrack-o1bw.vercel.app/api`.
 
 ### 7.1. Autentikasi Pengguna
 
