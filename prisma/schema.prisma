@@ -15,9 +15,9 @@ model User {
   email                 String                 @unique
   name                  String?
   password              String
-  // currentBalance        Float                  @default(0) // <--- DIHAPUS: Saldo total akan dihitung dari akun
   
-  accounts              Account[]              // Relasi baru: User memiliki banyak Akun
+  accounts              Account[]              // Relasi: User memiliki banyak Akun
+  savingGoals           SavingGoal[]           // <--- BARU: Relasi ke SavingGoal
   posts                 Post[]
   expenses              Expense[]
   incomes               Income[]
@@ -43,6 +43,23 @@ model Account {
   updatedAt             DateTime               @updatedAt
 }
 
+// Model Baru: SavingGoal
+model SavingGoal {
+  id                    String                 @id @default(auto()) @map("_id") @db.ObjectId
+  userId                String                 @db.ObjectId
+  user                  User                   @relation(fields: [userId], references: [id])
+  name                  String                 // Nama tujuan tabungan, misal "Beli Sepeda", "Liburan Bali"
+  targetAmount          Float                  // Jumlah target yang ingin dicapai
+  currentSavedAmount    Float                  @default(0) // Jumlah yang sudah dialokasikan untuk tujuan ini
+  isCompleted           Boolean                @default(false) // Apakah tujuan sudah tercapai
+  
+  // Jika Anda ingin melacak setiap alokasi sebagai transaksi terpisah (opsional, untuk history)
+  // allocations           SavingAllocation[] 
+
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+}
+
 // Model Post (tidak berubah)
 model Post {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
@@ -55,30 +72,30 @@ model Post {
   updatedAt DateTime @updatedAt
 }
 
-// Model Expense (Modifikasi: Tambah accountId dan relasi)
+// Model Expense (Sudah dimodifikasi sebelumnya)
 model Expense {
   id          String    @id @default(auto()) @map("_id") @db.ObjectId
   userId      String    @db.ObjectId
   user        User      @relation(fields: [userId], references: [id])
-  accountId   String    @db.ObjectId // <--- BARU: Hubungkan ke Account
-  account     Account   @relation(fields: [accountId], references: [id]) // <--- BARU: Relasi ke Account
+  accountId   String    @db.ObjectId
+  account     Account   @relation(fields: [accountId], references: [id])
   amount      Float
-  category    String    // Kategori pengeluaran (misal: "Makanan", "Transportasi", "Hiburan")
+  category    String
   date        DateTime  @default(now())
   description String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
 
-// Model Income (Modifikasi: Tambah accountId dan relasi)
+// Model Income (Sudah dimodifikasi sebelumnya)
 model Income {
   id          String    @id @default(auto()) @map("_id") @db.ObjectId
   userId      String    @db.ObjectId
   user        User      @relation(fields: [userId], references: [id])
-  accountId   String    @db.ObjectId // <--- BARU: Hubungkan ke Account
-  account     Account   @relation(fields: [accountId], references: [id]) // <--- BARU: Relasi ke Account
+  accountId   String    @db.ObjectId
+  account     Account   @relation(fields: [accountId], references: [id])
   amount      Float
-  source      String    // Sumber pemasukan (misal: "Gaji", "Freelance", "Hadiah")
+  source      String
   date        DateTime  @default(now())
   description String?
   createdAt   DateTime? @default(now())
