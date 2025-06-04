@@ -1,428 +1,348 @@
-# Dokumentasi API Fintrack Backend
+# Fintrack Backend API
 
-**Versi:** 1.0
-**Tanggal:** 2 Juni 2025
-**Lokasi:** Yogyakarta, Indonesia
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
----
+## Deskripsi Proyek
 
-## 1. Pendahuluan
+Fintrack Backend API adalah tulang punggung aplikasi manajemen keuangan pribadi Fintrack. API ini menyediakan fungsionalitas untuk otentikasi pengguna, pelacakan pemasukan dan pengeluaran berdasarkan akun, pengelolaan saldo per akun, dan fitur prediksi pengeluaran bulanan menggunakan model Machine Learning eksternal.
 
-Dokumen ini menjelaskan endpoint-endpoint yang tersedia di Fintrack Backend API. API ini dirancang untuk mendukung aplikasi manajemen keuangan pribadi, memungkinkan pengguna untuk mengelola pemasukan, pengeluaran, melihat saldo, dan mendapatkan prediksi pengeluaran.
+## Fitur Utama
 
----
+* **Autentikasi Pengguna:** Registrasi dan login pengguna menggunakan JWT (JSON Web Tokens) untuk keamanan.
 
-## 2. Base URL
+* **Manajemen Akun:** Buat, lihat, dan kelola berbagai akun keuangan (misalnya, rekening bank, e-wallet, kas tunai).
 
-Semua request API harus diawali dengan Base URL berikut:
+* **Pelacakan Transaksi:** Catat pemasukan dan pengeluaran, yang masing-masing terkait dengan akun spesifik.
 
-`http://localhost:3000/api`
+* **Manajemen Saldo Akun:** Setiap akun memiliki saldonya sendiri yang diperbarui secara otomatis dengan setiap transaksi.
 
-*(Catatan: Ganti `3000` dengan port server Anda jika konfigurasi berbeda.)*
+* **Total Saldo Pengguna:** Saldo total pengguna dihitung secara dinamis sebagai penjumlahan dari semua saldo akun mereka.
 
----
+* **Edit & Hapus Transaksi:** Kemampuan untuk memperbarui atau menghapus entri transaksi, dengan penyesuaian saldo akun yang otomatis.
 
-## 3. Autentikasi (JWT)
+* **Validasi Saldo:** Mencegah pengeluaran yang melebihi saldo akun yang tersedia.
 
-Aplikasi ini menggunakan JSON Web Tokens (JWT) untuk tujuan autentikasi.
+* **Prediksi Pengeluaran:** Mengintegrasikan dengan model Machine Learning (Flask API) untuk memprediksi pengeluaran bulan berikutnya berdasarkan riwayat transaksi.
 
-### 3.1 Alur Autentikasi
+## Teknologi yang Digunakan
 
-1.  **Login:** Pengguna mengirimkan kredensial (email dan password) ke endpoint `/auth/login`.
-2.  **Penerimaan Token:** Jika kredensial valid, server akan mengembalikan JWT.
-3.  **Penggunaan Token:** Untuk mengakses endpoint yang dilindungi (selain register dan login), klien harus menyertakan JWT ini dalam header `Authorization` pada setiap request.
+* **Framework:** Next.js (untuk API Routes)
 
-### 3.2 Header Autentikasi
+* **Bahasa Pemrograman:** TypeScript
 
-* **Key:** `Authorization`
-* **Value:** `Bearer <YOUR_JWT_TOKEN>`
-    *(Ganti `<YOUR_JWT_TOKEN>` dengan token yang Anda dapatkan setelah login. Pastikan ada kata `Bearer` diikuti satu spasi.)*
+* **ORM:** Prisma
 
----
+* **Database:** MongoDB
 
-## 4. Daftar Endpoint
+* **Autentikasi:** JWT (jsonwebtoken), bcryptjs
 
-### 4.1. Endpoint Autentikasi Pengguna
+* **Integrasi ML:** Interaksi dengan Flask API eksternal (membutuhkan Flask API terpisah untuk fitur prediksi)
 
-#### 4.1.1. Registrasi Pengguna
+## Setup Proyek Lokal
 
-* **HTTP Method:** `POST`
-* **URL:** `/auth/register`
-* **Deskripsi:** Mendaftarkan pengguna baru ke sistem.
+Ikuti langkah-langkah di bawah ini untuk menjalankan proyek Fintrack Backend API di lingkungan lokal Anda.
+
+### 1. Klon Repositori
+
+```bash
+git clone https://github.com/your-username/Fintrack-Backend.git # Ganti dengan URL repo Anda
+cd Fintrack-Backend
+```
+
+### 2. Instal Dependensi
+
+Instal semua paket yang diperlukan menggunakan npm atau yarn:
+
+```bash
+npm install
+# atau
+yarn install
+```
+
+### 3. Konfigurasi Environment Variables
+
+Buat file `.env` di root proyek Anda (`Fintrack-Backend/`) dan tambahkan variabel lingkungan berikut:
+
+```dotenv
+DATABASE_URL="mongodb+srv://<username>:<password>@<cluster-url>/Fintrack-nextjs?retryWrites=true&w=majority"
+JWT_SECRET="YOUR_VERY_STRONG_AND_RANDOM_JWT_SECRET_KEY_HERE"
+FLASK_API_URL="http://localhost:5000/predict_expense" # Ganti jika Flask API Anda di URL lain
+```
+
+* Ganti `<username>`, `<password>`, dan `<cluster-url>` dengan kredensial database MongoDB Anda.
+
+* Ganti `YOUR_VERY_STRONG_AND_RANDOM_JWT_SECRET_KEY_HERE` dengan string acak yang panjang dan kompleks. Anda bisa menggunakan generator string acak online atau `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` di terminal.
+
+### 4. Setup Prisma dan Database
+
+Pastikan skema database Prisma Anda sudah benar. Proyek ini menggunakan model `User`, `Account`, `Expense`, `Income`, `Post`, dan `BudgetRecommendation`.
+
+* **Generasi Prisma Client:**
+  Setelah mengatur `.env` dan menginstal dependensi, generate Prisma Client untuk memastikan tipenya selaras dengan skema Anda:
+
+  ```bash
+  npx prisma generate
+  ```
+
+  *(Catatan: Karena menggunakan MongoDB, Prisma tidak memerlukan `migrate dev`. Perubahan skema langsung diterapkan saat operasi data dilakukan atau setelah `generate`.)*
+
+* **Pembersihan Data Awal (Opsional tapi Direkomendasikan):**
+  Jika Anda ingin memulai dengan data keuangan yang bersih (tetapi mempertahankan data pengguna), Anda bisa menjalankan script pembersih:
+
+  1. Buat file `scripts/clear-financial-data.ts` di root proyek.
+
+  2. Isi dengan kode dari sesi kita sebelumnya.
+
+  3. Jalankan `npx tsc scripts/clear-financial-data.ts` lalu `node scripts/clear-financial-data.js`.
+
+### 5. Menjalankan Server Pengembangan
+
+Mulai server Next.js dalam mode pengembangan:
+
+```bash
+npm run dev
+# atau
+yarn dev
+```
+
+API Anda akan berjalan di `http://localhost:3000` (atau port lain yang dikonfigurasi oleh Next.js).
+
+## Dokumentasi API Endpoints
+
+Semua endpoint API Anda berada di bawah Base URL `http://localhost:3000/api`.
+
+### Autentikasi Pengguna
+
+#### `POST /auth/register` - Registrasi Pengguna
+
+* **Deskripsi:** Mendaftarkan pengguna baru ke sistem dengan akun default pertama.
+
 * **Autentikasi:** Tidak diperlukan
-* **Request Headers:**
-    * `Content-Type: application/json`
+
 * **Request Body (JSON):**
-    ```json
-    {
-        "email": "user.baru@example.com",
-        "name": "Nama Pengguna",
-        "password": "kataSandiAman123",
-        "initialBalance": 0.00
-    }
-    ```
-* **Success Response (Status: 201 Created):**
-    ```json
-    {
-        "message": "User registered successfully",
-        "user": {
-            "id": "6532d88009d1e3d3f4b4a687",
-            "email": "user.baru@example.com",
-            "name": "Nama Pengguna",
-            "currentBalance": 0,
-            "createdAt": "2025-06-02T08:00:00.000Z"
-        }
-    }
-    ```
-* **Error Responses:**
-    * `400 Bad Request`: `{ "message": "Email and password are required" }`
-    * `409 Conflict`: `{ "message": "User with this email already exists" }`
-    * `500 Internal Server Error`: `{ "message": "Failed to register user", "error": "..." }`
 
-#### 4.1.2. Login Pengguna
+  ```json
+  {
+    "email": "user.baru@example.com",
+    "name": "Nama Pengguna",
+    "password": "kataSandiAman123",
+    "initialBalance": 0.00
+  }
+  ```
 
-* **HTTP Method:** `POST`
-* **URL:** `/auth/login`
+* **Success Response:** `201 Created`
+
+#### `POST /auth/login` - Login Pengguna
+
 * **Deskripsi:** Mengautentikasi pengguna dan mengembalikan token JWT.
+
 * **Autentikasi:** Tidak diperlukan
-* **Request Headers:**
-    * `Content-Type: application/json`
+
 * **Request Body (JSON):**
-    ```json
-    {
-        "email": "user.test@example.com",
-        "password": "strongPassword123"
-    }
-    ```
-* **Success Response (Status: 200 OK):**
-    ```json
-    {
-        "message": "Login successful",
-        "token": "YOUR_ACTUAL_JWT_TOKEN_HERE",
-        "userId": "665b1d7d2a3c4f5e6d7e8f90",
-        "name": "Testing User"
-    }
-    ```
-* **Error Responses:**
-    * `400 Bad Request`: `{ "message": "Email and password are required" }`
-    * `401 Unauthorized`: `{ "message": "Invalid credentials" }`
-    * `500 Internal Server Error`: `{ "message": "Failed to login", "error": "..." }`
 
----
+  ```json
+  {
+    "email": "user.test@example.com",
+    "password": "strongPassword123"
+  }
+  ```
 
-### 4.2. Endpoint Pengeluaran (Expenses)
+* **Success Response:** `200 OK`, `{ "token": "...", "userId": "...", "name": "..." }`
 
-#### 4.2.1. Tambah Pengeluaran
+### Manajemen Akun
 
-* **HTTP Method:** `POST`
-* **URL:** `/expenses`
-* **Deskripsi:** Menambahkan entri pengeluaran baru untuk pengguna yang terautentikasi dan menyesuaikan saldo.
+#### `POST /accounts` - Buat Akun Baru
+
+* **Deskripsi:** Membuat akun bank/wallet baru untuk pengguna yang terautentikasi.
+
 * **Autentikasi:** JWT Required
-* **Request Headers:**
-    * `Content-Type: application/json`
-    * `Authorization: Bearer <YOUR_JWT_TOKEN>`
-* **Request Body (JSON):** (`userId` diambil dari token, tidak perlu di body)
-    ```json
-    {
-        "amount": 50.75,
-        "date": "2025-06-02T14:30:00Z",
-        "description": "Makan siang di kantor",
-        "category": "Food"
-    }
-    ```
-* **Success Response (Status: 201 Created):**
-    ```json
-    {
-        "message": "Expense added successfully and balance updated",
-        "expense": {
-            "id": "665b2a2e1f2e3d4c5b6a7d8e",
-            "amount": 50.75,
-            "date": "2025-06-02T14:30:00.000Z",
-            "description": "Makan siang di kantor",
-            "userId": "665b1d7d2a3c4f5e6d7e8f90",
-            "category": "Food",
-            "createdAt": "2025-06-02T14:30:00.000Z",
-            "updatedAt": "2025-06-02T14:30:00.000Z"
-        },
-        "newBalance": 1234.56
-    }
-    ```
-* **Error Responses:**
-    * `400 Bad Request`: `{ "message": "Invalid amount. Must be a positive number." }`
-    * `401 Unauthorized`: `{ "message": "Invalid or expired token" }`
-    * `404 Not Found`: `{ "message": "User not found" }`
-    * `500 Internal Server Error`: `{ "message": "Failed to add expense or update balance", "error": "..." }`
 
-#### 4.2.2. Lihat Semua Pengeluaran
+* **Request Body (JSON):**
 
-* **HTTP Method:** `GET`
-* **URL:** `/expenses`
+  ```json
+  {
+    "name": "BCA Savings",
+    "initialBalance": 1000000.00,
+    "type": "Bank"
+  }
+  ```
+
+* **Success Response:** `201 Created`
+
+#### `GET /accounts` - Lihat Semua Akun Pengguna
+
+* **Deskripsi:** Mengambil semua akun keuangan milik pengguna yang terautentikasi.
+
+* **Autentikasi:** JWT Required
+
+* **Success Response:** `200 OK`, `{ "accounts": [...] }`
+
+### Pengeluaran (Expenses)
+
+#### `POST /expenses` - Tambah Pengeluaran
+
+* **Deskripsi:** Menambahkan entri pengeluaran baru dan menyesuaikan saldo akun terkait.
+
+* **Autentikasi:** JWT Required
+
+* **Request Body (JSON):**
+
+  ```json
+  {
+    "amount": 50.75,
+    "date": "2025-06-02T14:30:00Z",
+    "description": "Makan siang",
+    "category": "Food",
+    "accountId": "YOUR_ACCOUNT_ID"
+  }
+  ```
+
+* **Success Response:** `201 Created`
+
+* **Error:** `400 Bad Request` (`"Insufficient balance in selected account."`)
+
+#### `GET /expenses` - Lihat Semua Pengeluaran
+
 * **Deskripsi:** Mengambil semua entri pengeluaran untuk pengguna yang terautentikasi.
+
 * **Autentikasi:** JWT Required
-* **Request Headers:**
-    * `Authorization: Bearer <YOUR_JWT_TOKEN>`
-* **Success Response (Status: 200 OK):**
-    ```json
-    {
-        "expenses": [
-            {
-                "id": "665b2a2e1f2e3d4c5b6a7d8e",
-                "amount": 50.75,
-                "date": "2025-06-02T14:30:00.000Z",
-                "description": "Makan siang di kantor",
-                "userId": "665b1d7d2a3c4f5e6d7e8f90",
-                "category": "Food",
-                "createdAt": "2025-06-02T14:30:00.000Z",
-                "updatedAt": "2025-06-02T14:30:00.000Z"
-            },
-            // ... more expense objects
-        ]
-    }
-    ```
-* **Error Responses:**
-    * `401 Unauthorized`: `{ "message": "Invalid or expired token" }`
-    * `500 Internal Server Error`: `{ "message": "Failed to fetch expenses", "error": "..." }`
 
-#### 4.2.3. Update Pengeluaran Berdasarkan ID
+* **Success Response:** `200 OK`, `{ "expenses": [...] }`
 
-* **HTTP Method:** `PUT`
-* **URL:** `/expenses/:expenseId`
-* **Deskripsi:** Memperbarui detail pengeluaran yang sudah ada dan menyesuaikan saldo.
+#### `PUT /expenses/:expenseId` - Update Pengeluaran Berdasarkan ID
+
+* **Deskripsi:** Memperbarui detail pengeluaran dan menyesuaikan saldo akun terkait.
+
 * **Autentikasi:** JWT Required
-* **Request Headers:**
-    * `Content-Type: application/json`
-    * `Authorization: Bearer <YOUR_JWT_TOKEN>`
-* **URL Params:**
-    * `:expenseId` (String): ID unik pengeluaran yang akan diperbarui.
-* **Request Body (JSON):** Sertakan field yang ingin diperbarui.
-    ```json
-    {
-        "amount": 60.00,
-        "date": "2025-06-02T14:30:00Z",
-        "description": "Makan siang di kantor (revisi)",
-        "category": "Food"
-    }
-    ```
-* **Success Response (Status: 200 OK):**
-    ```json
-    {
-        "message": "Expense updated successfully and balance adjusted.",
-        "expense": {
-            "id": "665b2a2e1f2e3d4c5b6a7d8e",
-            "amount": 60.00,
-            "date": "2025-06-02T14:30:00.000Z",
-            "description": "Makan siang di kantor (revisi)",
-            "userId": "665b1d7d2a3c4f5e6d7e8f90",
-            "category": "Food",
-            "createdAt": "2025-06-02T14:30:00.000Z",
-            "updatedAt": "2025-06-02T14:35:00.000Z"
-        },
-        "newBalance": 1234.56 // Saldo setelah penyesuaian
-    }
-    ```
-* **Error Responses:**
-    * `400 Bad Request`: `{ "message": "Invalid amount..." }` atau `{ "message": "Expense ID is required." }`
-    * `401 Unauthorized`: `{ "message": "Invalid or expired token" }`
-    * `403 Forbidden`: `{ "message": "Unauthorized: You do not own this expense." }`
-    * `404 Not Found`: `{ "message": "Expense not found." }`
-    * `500 Internal Server Error`: `{ "message": "Failed to update expense.", "error": "..." }`
 
-#### 4.2.4. Hapus Pengeluaran Berdasarkan ID
+* **URL Params:** `:expenseId` (ID pengeluaran)
 
-* **HTTP Method:** `DELETE`
-* **URL:** `/expenses/:expenseId`
-* **Deskripsi:** Menghapus entri pengeluaran dan menyesuaikan saldo.
-* **Autentikasi:** JWT Required
-* **Request Headers:**
-    * `Authorization: Bearer <YOUR_JWT_TOKEN>`
-* **URL Params:**
-    * `:expenseId` (String): ID unik pengeluaran yang akan dihapus.
-* **Success Response (Status: 200 OK):**
-    ```json
-    {
-        "message": "Expense deleted successfully and balance adjusted.",
-        "newBalance": 1234.56 // Saldo setelah penyesuaian
-    }
-    ```
-* **Error Responses:**
-    * `400 Bad Request`: `{ "message": "Expense ID is required." }`
-    * `401 Unauthorized`: `{ "message": "Invalid or expired token" }`
-    * `403 Forbidden`: `{ "message": "Unauthorized: You do not own this expense." }`
-    * `404 Not Found`: `{ "message": "Expense not found." }`
-    * `500 Internal Server Error`: `{ "message": "Failed to delete expense.", "error": "..." }`
-
----
-
-### 4.3. Endpoint Pemasukan (Incomes)
-
-#### 4.3.1. Tambah Pemasukan
-
-* **HTTP Method:** `POST`
-* **URL:** `/incomes`
-* **Deskripsi:** Menambahkan entri pemasukan baru untuk pengguna yang terautentikasi dan menyesuaikan saldo.
-* **Autentikasi:** JWT Required
-* **Request Headers:**
-    * `Content-Type: application/json`
-    * `Authorization: Bearer <YOUR_JWT_TOKEN>`
-* **Request Body (JSON):** (`userId` diambil dari token, tidak perlu di body)
-    ```json
-    {
-        "amount": 500.00,
-        "date": "2025-06-01T09:00:00Z",
-        "description": "Pembayaran gaji",
-        "source": "Salary"
-    }
-    ```
-* **Success Response (Status: 201 Created):**
-    ```json
-    {
-        "message": "Income added successfully and balance updated",
-        "income": {
-            "id": "665b2a2e1f2e3d4c5b6a7d8e",
-            "amount": 500.00,
-            "date": "2025-06-01T09:00:00.000Z",
-            "description": "Pembayaran gaji",
-            "userId": "665b1d7d2a3c4f5e6d7e8f90",
-            "source": "Salary",
-            "createdAt": "2025-06-01T09:00:00.000Z",
-            "updatedAt": "2025-06-01T09:00:00.000Z"
-        },
-        "newBalance": 1234.56
-    }
-    ```
-* **Error Responses:** (Serupa dengan Pengeluaran)
-
-#### 4.3.2. Lihat Semua Pemasukan
-
-* **HTTP Method:** `GET`
-* **URL:** `/incomes`
-* **Deskripsi:** Mengambil semua entri pemasukan untuk pengguna yang terautentikasi.
-* **Autentikasi:** JWT Required
-* **Request Headers:**
-    * `Authorization: Bearer <YOUR_JWT_TOKEN>`
-* **Success Response (Status: 200 OK):** (Serupa dengan Pengeluaran)
-* **Error Responses:** (Serupa dengan Pengeluaran)
-
-#### 4.3.3. Update Pemasukan Berdasarkan ID
-
-* **HTTP Method:** `PUT`
-* **URL:** `/incomes/:incomeId`
-* **Deskripsi:** Memperbarui detail pemasukan yang sudah ada dan menyesuaikan saldo.
-* **Autentikasi:** JWT Required
-* **Request Headers:** (Sama dengan Pengeluaran)
-* **URL Params:**
-    * `:incomeId` (String): ID unik pemasukan yang akan diperbarui.
-* **Request Body (JSON):** Sertakan field yang ingin diperbarui.
-    ```json
-    {
-        "amount": 550.00,
-        "date": "2025-06-01T09:00:00Z",
-        "description": "Pembayaran gaji (revisi)",
-        "source": "Salary"
-    }
-    ```
-* **Success Response (Status: 200 OK):** (Serupa dengan Pengeluaran)
-* **Error Responses:** (Serupa dengan Pengeluaran)
-
-#### 4.3.4. Hapus Pemasukan Berdasarkan ID
-
-* **HTTP Method:** `DELETE`
-* **URL:** `/incomes/:incomeId`
-* **Deskripsi:** Menghapus entri pemasukan dan menyesuaikan saldo.
-* **Autentikasi:** JWT Required
-* **Request Headers:** (Sama dengan Pengeluaran)
-* **URL Params:**
-    * `:incomeId` (String): ID unik pemasukan yang akan dihapus.
-* **Success Response (Status: 200 OK):** (Serupa dengan Pengeluaran)
-* **Error Responses:** (Serupa dengan Pengeluaran)
-
----
-
-### 4.4. Endpoint Pengguna (Users)
-
-#### 4.4.1. Lihat Saldo Pengguna
-
-* **HTTP Method:** `GET`
-* **URL:** `/users/balance`
-* **Deskripsi:** Mengambil saldo terkini pengguna yang terautentikasi.
-* **Autentikasi:** JWT Required
-* **Request Headers:**
-    * `Authorization: Bearer <YOUR_JWT_TOKEN>`
-* **Success Response (Status: 200 OK):**
-    ```json
-    {
-        "currentBalance": 1234.56
-    }
-    ```
-* **Error Responses:**
-    * `401 Unauthorized`: `{ "message": "Invalid or expired token" }`
-    * `404 Not Found`: `{ "message": "User not found" }`
-    * `500 Internal Server Error`: `{ "message": "Failed to fetch user balance", "error": "..." }`
-
-#### 4.4.2. Lihat Detail Pengguna Berdasarkan ID
-
-* **HTTP Method:** `GET`
-* **URL:** `/users/:userId`
-* **Deskripsi:** Mengambil detail profil pengguna berdasarkan ID. Membutuhkan `userId` di URL yang harus cocok dengan `userId` dari token.
-* **Autentikasi:** JWT Required
-* **Request Headers:**
-    * `Authorization: Bearer <YOUR_JWT_TOKEN>`
-* **URL Params:**
-    * `:userId` (String): ID unik pengguna.
-* **Success Response (Status: 200 OK):**
-    ```json
-    {
-        "user": {
-            "id": "665b1d7d2a3c4f5e6d7e8f90",
-            "email": "user.test@example.com",
-            "name": "Testing User",
-            "currentBalance": 1234.56,
-            "createdAt": "2025-06-02T08:00:00.000Z",
-            "updatedAt": "2025-06-02T14:30:00.000Z"
-        }
-    }
-    ```
-* **Error Responses:**
-    * `400 Bad Request`: `{ "message": "User ID is required" }`
-    * `401 Unauthorized`: `{ "message": "Invalid or expired token" }`
-    * `403 Forbidden`: `{ "message": "Unauthorized: Token does not match requested user ID" }`
-    * `404 Not Found`: `{ "message": "User not found" }`
-    * `500 Internal Server Error`: `{ "message": "Failed to fetch user details", "error": "..." }`
-
----
-
-### 4.5. Endpoint Prediksi Pengeluaran (Machine Learning Integration)
-
-#### 4.5.1. Prediksi Pengeluaran Bulanan
-
-* **HTTP Method:** `POST`
-* **URL:** `/predict-expense`
-* **Deskripsi:** Memicu prediksi pengeluaran untuk bulan berikutnya berdasarkan data historis 6 bulan terakhir dari pengguna yang terautentikasi. Hasil prediksi juga disimpan sebagai rekomendasi anggaran.
-* **Autentikasi:** JWT Required
-* **Request Headers:**
-    * `Content-Type: application/json`
-    * `Authorization: Bearer <YOUR_JWT_TOKEN>`
 * **Request Body (JSON):**
-    * Body dapat kosong (`{}`) karena semua data yang dibutuhkan (userId, data historis) diambil dari token dan database.
-    ```json
-    {}
-    ```
-* **Success Response (Status: 200 OK):**
-    ```json
-    {
-        "predicted_expense": 500.25,
-        "message": "Prediction successful"
-    }
-    ```
-    * Atau jika tidak ada data historis:
-        ```json
-        {
-            "predicted_expense": 0,
-            "message": "No historical expenses found for prediction. Returning default budget."
-        }
-    ```
-* **Error Responses:**
-    * `401 Unauthorized`: `{ "message": "Invalid or expired token" }`
-    * `500 Internal Server Error`: `{ "error": "Internal server error: Failed to process request.", "details": "..." }`
 
----
+  ```json
+  {
+    "amount": 60.00,
+    "date": "2025-06-02T14:30:00Z",
+    "description": "Makan siang (revisi)",
+    "category": "Food"
+  }
+  ```
+
+* **Success Response:** `200 OK`
+
+* **Error:** `400 Bad Request` (`"Insufficient balance in account to increase expense amount."`)
+
+#### `DELETE /expenses/:expenseId` - Hapus Pengeluaran Berdasarkan ID
+
+* **Deskripsi:** Menghapus entri pengeluaran dan menyesuaikan saldo.
+
+* **Autentikasi:** JWT Required
+
+* **URL Params:** `:expenseId` (ID pengeluaran)
+
+* **Success Response:** `200 OK`
+
+### Pemasukan (Incomes)
+
+#### `POST /incomes` - Tambah Pemasukan
+
+* **Deskripsi:** Menambahkan entri pemasukan baru untuk pengguna yang terautentikasi dan menyesuaikan saldo.
+
+* **Autentikasi:** JWT Required
+
+* **Request Body (JSON):**
+
+  ```json
+  {
+    "amount": 500.00,
+    "date": "2025-06-01T09:00:00Z",
+    "description": "Pembayaran gaji",
+    "source": "Salary",
+    "accountId": "YOUR_ACCOUNT_ID"
+  }
+  ```
+
+* **Success Response:** `201 Created`
+
+#### `GET /incomes` - Lihat Semua Pemasukan
+
+* **Deskripsi:** Mengambil semua entri pemasukan untuk pengguna yang terautentikasi.
+
+* **Autentikasi:** JWT Required
+
+* **Success Response:** `200 OK`, `{ "incomes": [...] }`
+
+#### `PUT /incomes/:incomeId` - Update Pemasukan Berdasarkan ID
+
+* **Deskripsi:** Memperbarui detail pemasukan yang sudah ada dan menyesuaikan saldo.
+
+* **Autentikasi:** JWT Required
+
+* **URL Params:** `:incomeId` (ID pemasukan)
+
+* **Request Body (JSON):**
+
+  ```json
+  {
+    "amount": 550.00,
+    "date": "2025-06-01T09:00:00Z",
+    "description": "Pembayaran gaji (revisi)",
+    "source": "Salary"
+  }
+  ```
+
+* **Success Response:** `200 OK`
+
+#### `DELETE /incomes/:incomeId` - Hapus Pemasukan Berdasarkan ID
+
+* **Deskripsi:** Menghapus entri pemasukan dan menyesuaikan saldo.
+
+* **Autentikasi:** JWT Required
+
+* **URL Params:** `:incomeId` (ID pemasukan)
+
+* **Success Response:** `200 OK`
+
+### Pengguna (Users)
+
+#### `GET /users/balance` - Lihat Saldo Total Pengguna
+
+* **Deskripsi:** Mengambil saldo total terkini pengguna (penjumlahan saldo dari semua akun).
+
+* **Autentikasi:** JWT Required
+
+* **Success Response:** `200 OK`, `{ "currentBalance": 1234.56 }`
+
+#### `GET /users/:userId` - Lihat Detail Pengguna Berdasarkan ID
+
+* **Deskripsi:** Mengambil detail profil pengguna. Membutuhkan `userId` di URL yang harus cocok dengan `userId` dari token.
+
+* **Autentikasi:** JWT Required
+
+* **URL Params:** `:userId` (ID pengguna)
+
+* **Success Response:** `200 OK`, `{ "user": { "id": "...", "email": "...", "name": "..." } }`
+
+### Prediksi Pengeluaran
+
+#### `POST /predict-expense` - Prediksi Pengeluaran Bulanan
+
+* **Deskripsi:** Memicu prediksi pengeluaran untuk bulan berikutnya berdasarkan data historis 6 bulan terakhir dari pengguna yang terautentikasi. Hasil prediksi juga disimpan sebagai rekomendasi anggaran.
+
+* **Autentikasi:** JWT Required
+
+* **Request Body (JSON):**
+
+  ```json
+  {}
+  ```
+
+* **Success Response:** `200 OK`, `{ "predicted_expense": 500.25, "message": "..." }`
+
+## Kontribusi
+
+Kontribusi disambut baik! Silakan ajukan pull request atau laporkan masalah.
+
+## Lisensi
+
+Proyek ini dilisensikan di bawah [Lisensi MIT](https://opensource.org/licenses/MIT).
