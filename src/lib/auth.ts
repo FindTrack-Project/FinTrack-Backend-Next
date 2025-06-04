@@ -22,7 +22,7 @@ export function generateToken(userId: string) {
   if (!secret) {
     throw new Error("JWT_SECRET is not defined in environment variables.");
   }
-  return jwt.sign({ userId }, secret, { expiresIn: "1d" }); // Token berlaku 1 hari
+  return jwt.sign({ userId }, secret, { expiresIn: "1d" });
 }
 
 // Fungsi untuk memverifikasi JWT
@@ -34,6 +34,6 @@ export function verifyToken(token: string) {
   try {
     return jwt.verify(token, secret) as { userId: string };
   } catch {
-    return null; // Token tidak valid atau kedaluwarsa
+    return null;
   }
 }

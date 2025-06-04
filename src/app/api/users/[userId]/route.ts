@@ -2,7 +2,7 @@
 
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { verifyToken } from "@/lib/auth"; // Import utilitas verifikasi JWT
+import { verifyToken } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
@@ -10,23 +10,21 @@ export async function GET(
   req: Request,
   { params }: { params: { userId: string } }
 ) {
-  // Verifikasi Token
   const authHeader = req.headers.get("authorization");
-  const token = authHeader?.startsWith("Bearer ")
-    ? authHeader.slice(7)
-    : undefined;
-  const authResult = token ? verifyToken(token) : null;
-  if (!authResult || !authResult.userId) {
+  const token = authHeader?.split(" ")[1];
+  const payload = token ? verifyToken(token) : null;
+  if (!payload) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
-  const userIdFromToken = authResult.userId; // Dapatkan userId dari token!
+  const userIdFromToken = payload.userId;
 
   try {
-    const { userId } = params; // Dapatkan userId dari URL parameter
+    const awaitedParams = await params;
+    const { userId } = awaitedParams;
 
     if (!userId) {
       return NextResponse.json(
-        { message: "User ID is required" },
+        { message: "User ID is required." },
         { status: 400 }
       );
     }
@@ -39,23 +37,24 @@ export async function GET(
             "Unauthorized access: Token does not match requested user ID",
         },
         { status: 403 }
-      ); // Forbidden
+      );
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: userId }, // Gunakan userId dari URL/Token (karena sudah diverifikasi)
+      where: { id: userId },
       select: {
         id: true,
         email: true,
         name: true,
-        currentBalance: true,
+        // PERBAIKAN: Hapus baris 'currentBalance: true' dari sini
+        // currentBalance: true, // BARIS INI DIHAPUS
         createdAt: true,
         updatedAt: true,
       },
     });
 
     if (!user) {
-      return NextResponse.json({ message: "User not found" }, { status: 404 });
+      return NextResponse.json({ message: "User not found." }, { status: 404 });
     }
 
     return NextResponse.json({ user }, { status: 200 });
@@ -63,11 +62,11 @@ export async function GET(
     console.error("Error fetching user details:", error);
     return NextResponse.json(
       {
-        message: "Failed to fetch user details",
+        message: "Failed to fetch user details.",
         error:
           error instanceof Error
             ? error.message
-            : "An unexpected error occurred",
+            : "An unexpected error occurred.",
       },
       { status: 500 }
     );

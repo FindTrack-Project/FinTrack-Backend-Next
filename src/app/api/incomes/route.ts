@@ -2,28 +2,22 @@
 
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { verifyToken } from "@/lib/auth"; // Import utilitas verifikasi JWT
+import { verifyToken } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
+// --- METHOD: POST (Tambah Pemasukan) ---
 export async function POST(req: Request) {
-  // Verifikasi Token
   const authHeader = req.headers.get("authorization");
-  const token = authHeader?.startsWith("Bearer ")
-    ? authHeader.slice(7)
-    : authHeader || "";
+  const token = authHeader?.split(" ")[1] || "";
   const authResult = verifyToken(token);
-  if (
-    !authResult ||
-    typeof authResult !== "object" ||
-    !("userId" in authResult)
-  ) {
+  if (!authResult || !("userId" in authResult)) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
-  const userId = (authResult as { userId: string }).userId; // Dapatkan userId dari token!
+  const userId = authResult.userId;
 
   try {
-    const { amount, date, description, source } = await req.json(); // userId TIDAK perlu dari body lagi
+    const { amount, date, description, source, accountId } = await req.json(); // TAMBAH: accountId
 
     // 1. Validasi Input
     if (typeof amount !== "number" || isNaN(amount) || amount <= 0) {
@@ -32,10 +26,10 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    if (!date || !source) {
-      // userId sudah ada dari token
+    if (!date || !source || !accountId) {
+      // TAMBAH: accountId diperlukan
       return NextResponse.json(
-        { message: "Missing required fields: date, source" },
+        { message: "Missing required fields: date, source, accountId." },
         { status: 400 }
       );
     }
@@ -43,20 +37,29 @@ export async function POST(req: Request) {
     const parsedDate = new Date(date);
     if (isNaN(parsedDate.getTime())) {
       return NextResponse.json(
-        { message: "Invalid date format" },
+        { message: "Invalid date format." },
         { status: 400 }
       );
     }
 
-    // 2. Cek apakah user ada dan dapatkan saldo saat ini
-    const user = await prisma.user.findUnique({
-      where: { id: userId }, // Gunakan userId dari token
-      select: { currentBalance: true },
+    // 2. Cek apakah user ada dan dapatkan akun yang relevan
+    const account = await prisma.account.findUnique({
+      where: { id: accountId },
+      select: { id: true, userId: true, currentBalance: true }, // Ambil balance akun
     });
 
-    if (!user) {
-      // Ini seharusnya jarang terjadi jika token valid
-      return NextResponse.json({ message: "User not found" }, { status: 404 });
+    if (!account) {
+      return NextResponse.json(
+        { message: "Account not found." },
+        { status: 404 }
+      );
+    }
+    // Otorisasi: Pastikan akun ini milik user yang terotentikasi
+    if (account.userId !== userId) {
+      return NextResponse.json(
+        { message: "Unauthorized: Account does not belong to you." },
+        { status: 403 }
+      );
     }
 
     // 3. Buat entri pemasukan baru
@@ -65,38 +68,38 @@ export async function POST(req: Request) {
         amount: amount,
         date: parsedDate,
         description: description || null,
-        userId: userId, // Gunakan userId dari token
+        userId: userId,
+        accountId: accountId, // Gunakan accountId
         source: source,
       },
     });
 
-    // 4. Perbarui currentBalance pengguna (TAMBAH SALDO)
-    const updatedBalance = user.currentBalance + amount;
+    // 4. Perbarui currentBalance AKUN (TAMBAH SALDO)
+    const updatedAccountBalance = account.currentBalance + amount;
 
-    await prisma.user.update({
-      where: { id: userId }, // Gunakan userId dari token
+    await prisma.account.update({
+      where: { id: account.id },
       data: {
-        currentBalance: updatedBalance,
+        currentBalance: updatedAccountBalance,
       },
     });
 
     return NextResponse.json(
       {
-        message: "Income added successfully and balance updated",
+        message: "Income added successfully and account balance updated.",
         income: newIncome,
-        newBalance: updatedBalance,
+        newAccountBalance: updatedAccountBalance, // Kembalikan saldo akun yang baru
       },
       { status: 201 }
     );
   } catch (error: unknown) {
-    console.error("Error adding income or updating balance:", error);
+    console.error("Error adding income or updating account balance:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "An unexpected error occurred.";
     return NextResponse.json(
       {
-        message: "Failed to add income or update balance",
-        error:
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred",
+        message: "Failed to add income or update account balance.",
+        error: errorMessage,
       },
       { status: 500 }
     );
@@ -105,39 +108,36 @@ export async function POST(req: Request) {
   }
 }
 
+// --- METHOD: GET (Lihat Semua Pemasukan) ---
 export async function GET(req: Request) {
-  // Extract token from Authorization header
   const authHeader = req.headers.get("authorization");
-  const token = authHeader?.startsWith("Bearer ")
-    ? authHeader.slice(7)
-    : authHeader || "";
+  const token = authHeader?.split(" ")[1] || "";
   const authResult = verifyToken(token);
-  if (
-    !authResult ||
-    typeof authResult !== "object" ||
-    !("userId" in authResult)
-  ) {
+  if (!authResult || !("userId" in authResult)) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
-  const userId = (authResult as { userId: string }).userId; // Dapatkan userId dari token!
+  const userId = authResult.userId;
 
   try {
-    // Ambil userId dari token, bukan dari query params
     const incomes = await prisma.income.findMany({
-      where: { userId: userId }, // Gunakan userId dari token
-      orderBy: { date: "desc" },
+      where: { userId: userId },
     });
 
-    return NextResponse.json({ incomes }, { status: 200 });
+    return NextResponse.json(
+      {
+        message: "Incomes fetched successfully.",
+        incomes: incomes,
+      },
+      { status: 200 }
+    );
   } catch (error: unknown) {
     console.error("Error fetching incomes:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "An unexpected error occurred";
     return NextResponse.json(
       {
         message: "Failed to fetch incomes",
-        error:
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred",
+        error: errorMessage,
       },
       { status: 500 }
     );

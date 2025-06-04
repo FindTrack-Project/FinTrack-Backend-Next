@@ -6,36 +6,30 @@ import { verifyToken } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
+// --- METHOD: POST (Tambah Pengeluaran) ---
 export async function POST(req: Request) {
   const authHeader = req.headers.get("authorization");
-  const token = authHeader?.split(" ")[1]; // Expecting "Bearer <token>"
-  if (!token) {
-    return NextResponse.json(
-      { message: "Missing or invalid authorization token." },
-      { status: 401 }
-    );
+  const token = authHeader?.split(" ")[1] || "";
+  const authResult = verifyToken(token);
+  if (!authResult || !authResult.userId) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
-  const payload = verifyToken(token);
-  if (!payload || !payload.userId) {
-    return NextResponse.json(
-      { message: "Invalid or expired token." },
-      { status: 401 }
-    );
-  }
-  const userId = payload.userId;
+  const userId = authResult.userId;
 
   try {
-    const { amount, date, description, category } = await req.json();
+    const { amount, date, description, category, accountId } = await req.json(); // TAMBAH: accountId
 
+    // 1. Validasi Input
     if (typeof amount !== "number" || isNaN(amount) || amount <= 0) {
       return NextResponse.json(
         { message: "Invalid amount. Must be a positive number." },
         { status: 400 }
       );
     }
-    if (!date || !category) {
+    if (!date || !category || !accountId) {
+      // TAMBAH: accountId diperlukan
       return NextResponse.json(
-        { message: "Missing required fields: date, category." },
+        { message: "Missing required fields: date, category, accountId." },
         { status: 400 }
       );
     }
@@ -48,60 +42,74 @@ export async function POST(req: Request) {
       );
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { currentBalance: true },
+    // 2. Cek apakah user ada dan dapatkan akun yang relevan
+    const account = await prisma.account.findUnique({
+      where: { id: accountId },
+      select: { id: true, userId: true, currentBalance: true }, // Ambil balance akun
     });
 
-    if (!user) {
-      return NextResponse.json({ message: "User not found." }, { status: 404 });
+    if (!account) {
+      return NextResponse.json(
+        { message: "Account not found." },
+        { status: 404 }
+      );
+    }
+    // Otorisasi: Pastikan akun ini milik user yang terotentikasi
+    if (account.userId !== userId) {
+      return NextResponse.json(
+        { message: "Unauthorized: Account does not belong to you." },
+        { status: 403 }
+      );
     }
 
-    // --- VALIDASI BARU: Cek Saldo Tidak Cukup ---
-    if (user.currentBalance < amount) {
+    // 3. Validasi Saldo Akun Tidak Cukup
+    if (account.currentBalance < amount) {
       return NextResponse.json(
         {
-          message: "Insufficient balance. Cannot perform this expense.",
-          currentBalance: user.currentBalance,
+          message:
+            "Insufficient balance in selected account. Cannot perform this expense.",
+          accountBalance: account.currentBalance,
           expenseAmount: amount,
         },
         { status: 400 }
-      ); // Atau 402 Payment Required jika ingin lebih spesifik
+      );
     }
-    // --- AKHIR VALIDASI BARU ---
 
+    // 4. Buat entri pengeluaran baru
     const newExpense = await prisma.expense.create({
       data: {
         amount: amount,
         date: parsedDate,
         description: description || null,
         userId: userId,
+        accountId: accountId, // Gunakan accountId
         category: category,
       },
     });
 
-    const updatedBalance = user.currentBalance - amount;
+    // 5. Perbarui currentBalance AKUN (KURANGI SALDO)
+    const updatedAccountBalance = account.currentBalance - amount;
 
-    await prisma.user.update({
-      where: { id: userId },
+    await prisma.account.update({
+      where: { id: accountId },
       data: {
-        currentBalance: updatedBalance,
+        currentBalance: updatedAccountBalance,
       },
     });
 
     return NextResponse.json(
       {
-        message: "Expense added successfully and balance updated.",
+        message: "Expense added successfully and account balance updated.",
         expense: newExpense,
-        newBalance: updatedBalance,
+        newAccountBalance: updatedAccountBalance, // Kembalikan saldo akun yang baru
       },
       { status: 201 }
     );
   } catch (error: unknown) {
-    console.error("Error adding expense or updating balance:", error);
+    console.error("Error adding expense or updating account balance:", error);
     return NextResponse.json(
       {
-        message: "Failed to add expense or update balance.",
+        message: "Failed to add expense or update account balance.",
         error:
           error instanceof Error
             ? error.message
@@ -113,40 +121,16 @@ export async function POST(req: Request) {
     await prisma.$disconnect();
   }
 }
-
-// Opsional: GET semua pengeluaran untuk user tertentu
 export async function GET(req: Request) {
-  // 1. Verifikasi Token
   const authHeader = req.headers.get("authorization");
-  const token = authHeader?.split(" ")[1]; // Expecting "Bearer <token>"
-  if (!token) {
-    return NextResponse.json(
-      { message: "Missing or invalid authorization token." },
-      { status: 401 }
-    );
+  const token = authHeader?.split(" ")[1] || "";
+  const authResult = verifyToken(token);
+  if (!authResult || !authResult.userId) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
-  const payload = verifyToken(token);
-  if (!payload || !payload.userId) {
-    return NextResponse.json(
-      { message: "Invalid or expired token." },
-      { status: 401 }
-    );
-  }
-  const userId = payload.userId; // Dapatkan userId dari token!
+  const userId = authResult.userId;
 
   try {
-    // Hapus pengambilan userId dari query params
-    // const { searchParams } = new URL(req.url);
-    // const userId = searchParams.get("userId");
-
-    // Hapus validasi ini karena userId selalu ada dari token yang valid
-    // if (!userId) { // <--- BLOK INI DIHAPUS
-    //   return NextResponse.json(
-    //     { message: "User ID is required" },
-    //     { status: 400 }
-    //   );
-    // }
-
     const expenses = await prisma.expense.findMany({
       where: { userId: userId },
       orderBy: { date: "desc" },
@@ -154,7 +138,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ expenses }, { status: 200 });
   } catch (error: unknown) {
-    // Menggunakan 'unknown' untuk konsistensi penanganan error
     console.error("Error fetching expenses:", error);
     return NextResponse.json(
       {

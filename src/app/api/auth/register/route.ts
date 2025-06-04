@@ -1,75 +1,89 @@
+// src/api/auth/register/route.ts
+
+import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { hashPassword } from "@/lib/auth";
+import bcrypt from "bcryptjs";
 
-function addCorsHeaders(response: NextResponse) {
-  response.headers.set("Access-Control-Allow-Origin", "http://localhost:3000");
-  response.headers.set(
-    "Access-Control-Allow-Methods",
-    "GET,POST,PUT,DELETE,OPTIONS"
-  );
-  response.headers.set(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization"
-  );
-  response.headers.set("Access-Control-Allow-Credentials", "true");
-  return response;
-}
+const prisma = new PrismaClient();
 
-export async function OPTIONS() {
-  const response = new NextResponse(null, { status: 204 });
-  return addCorsHeaders(response);
-}
-
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const { name, email, password } = await request.json();
+    const { email, name, password, initialBalance } = await req.json();
 
     if (!email || !password) {
-      const response = NextResponse.json(
+      return NextResponse.json(
         { message: "Email and password are required" },
         { status: 400 }
       );
-      return addCorsHeaders(response);
     }
 
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { email: email },
     });
 
     if (existingUser) {
-      const response = NextResponse.json(
+      return NextResponse.json(
         { message: "User with this email already exists" },
         { status: 409 }
       );
-      return addCorsHeaders(response);
     }
 
-    const hashedPassword = await hashPassword(password);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = await prisma.user.create({
       data: {
-        name,
-        email,
+        email: email,
+        name: name || null,
         password: hashedPassword,
+        // currentBalance dihapus dari model User
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        createdAt: true,
       },
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password: _, ...userWithoutPassword } = newUser;
+    // TAMBAH: Buat akun default pertama untuk user baru
+    const parsedInitialBalance =
+      typeof initialBalance === "number" && !isNaN(initialBalance)
+        ? initialBalance
+        : 0;
 
-    const response = NextResponse.json(userWithoutPassword, { status: 201 });
-    return addCorsHeaders(response);
+    await prisma.account.create({
+      data: {
+        userId: newUser.id,
+        name: "Main Account", // Atau "Cash", "Primary Wallet"
+        currentBalance: parsedInitialBalance,
+        type: "General", // Atau "Cash", "Bank", "E-Wallet"
+      },
+    });
+
+    return NextResponse.json(
+      {
+        message: "User registered successfully and default account created.",
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          name: newUser.name,
+        },
+      },
+      { status: 201 }
+    );
   } catch (error: unknown) {
-    console.error("Registration error:", error);
-    let errorMessage = "An unknown error occurred";
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    }
-    const response = NextResponse.json(
-      { message: "Registration failed", error: errorMessage },
+    console.error("Error during user registration:", error);
+    return NextResponse.json(
+      {
+        message: "Failed to register user",
+        error:
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred",
+      },
       { status: 500 }
     );
-    return addCorsHeaders(response);
+  } finally {
+    await prisma.$disconnect();
   }
 }
