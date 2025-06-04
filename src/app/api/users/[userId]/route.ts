@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 
 export async function GET(
   req: Request,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   const authHeader = req.headers.get("authorization");
   const token = authHeader?.startsWith("Bearer ")
@@ -27,9 +27,8 @@ export async function GET(
   const userIdFromToken = payload.userId;
 
   try {
-    // PERBAIKAN: Hapus 'await' pada params
-    // const awaitedParams = await params;
-    const { userId } = params; // Langsung destructure dari params
+    // Await params before destructuring
+    const { userId } = await params;
 
     if (!userId) {
       const response = NextResponse.json(

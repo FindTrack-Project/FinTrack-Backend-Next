@@ -10,7 +10,7 @@ const prisma = new PrismaClient();
 // --- METHOD: POST (Allocate Funds to Saving Goal) ---
 export async function POST(
   req: Request,
-  { params }: { params: { goalId: string } }
+  { params }: { params: Promise<{ goalId: string }> }
 ) {
   const authHeader =
     req.headers.get("authorization") || req.headers.get("Authorization");
@@ -28,9 +28,8 @@ export async function POST(
   const userIdFromToken = authResult.userId;
 
   try {
-    // PERBAIKAN: Hapus 'await' pada params
-    // const awaitedParams = await params;
-    const { goalId } = params; // Langsung destructure dari params
+    // Await the params promise before destructuring
+    const { goalId } = await params;
 
     const { amount, accountId } = await req.json();
 

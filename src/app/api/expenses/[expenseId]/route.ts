@@ -3,14 +3,14 @@
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
-import { withCORS, handleCORSPreflight } from "@/lib/cors"; // Import helper CORS
+import { withCORS, handleCORSPreflight } from "@/lib/cors";
 
 const prisma = new PrismaClient();
 
 // --- METHOD: PUT (Update Expense) ---
 export async function PUT(
   req: Request,
-  { params }: { params: { expenseId: string } }
+  { params }: { params: Promise<{ expenseId: string }> }
 ) {
   const authHeader =
     req.headers.get("authorization") || req.headers.get("Authorization");
@@ -32,9 +32,8 @@ export async function PUT(
   const userIdFromToken = authResult.userId;
 
   try {
-    // PERBAIKAN: Hapus 'await' pada params
-    // const awaitedParams = await params; // BARIS INI DIHAPUS
-    const { expenseId } = params; // Langsung destructure dari params
+    // PERBAIKAN: Await params untuk mendapatkan expenseId
+    const { expenseId } = await params;
 
     const { amount, date, description, category } = await req.json();
 
@@ -206,7 +205,7 @@ export async function PUT(
 // --- METHOD: DELETE (Delete Expense) ---
 export async function DELETE(
   req: Request,
-  { params }: { params: { expenseId: string } }
+  { params }: { params: Promise<{ expenseId: string }> }
 ) {
   const authHeader =
     req.headers.get("authorization") || req.headers.get("Authorization");
@@ -228,9 +227,8 @@ export async function DELETE(
   const userIdFromToken = authResult.userId;
 
   try {
-    // PERBAIKAN: Hapus 'await' pada params
-    // const awaitedParams = await params; // BARIS INI DIHAPUS
-    const { expenseId } = params; // Langsung destructure dari params
+    // PERBAIKAN: Await params untuk mendapatkan expenseId
+    const { expenseId } = await params;
 
     if (!expenseId) {
       const response = NextResponse.json(

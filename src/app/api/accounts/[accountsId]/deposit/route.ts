@@ -1,36 +1,34 @@
 // src/api/app/accounts/[accountId]/deposit/route.ts
-
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
-import { withCORS, handleCORSPreflight } from "@/lib/cors"; // Import helper CORS
+import { withCORS, handleCORSPreflight } from "@/lib/cors";
 
 const prisma = new PrismaClient();
 
+// PERBAIKAN: Gunakan struktur parameter yang benar untuk Next.js 13+ App Router
 export async function POST(
   req: Request,
-  { params }: { params: { accountId: string } }
+  { params }: { params: Promise<{ accountId: string }> }
 ) {
-  const authHeader =
-    req.headers.get("authorization") || req.headers.get("Authorization");
+  const authHeader = req.headers.get("authorization");
   const token = authHeader?.startsWith("Bearer ")
     ? authHeader.slice(7)
     : authHeader || "";
   const authResult = verifyToken(token);
-  if (!authResult || !authResult.userId) {
+  if (!authResult) {
     const response = NextResponse.json(
       { message: "Unauthorized: Invalid or missing token." },
       { status: 401 }
     );
     return withCORS(response, ["POST"], ["Content-Type", "Authorization"]);
   }
+
   const userIdFromToken = authResult.userId;
 
   try {
-    // PERBAIKAN: Hapus 'await' pada params
-    // const awaitedParams = await params;
-    const { accountId } = params; // Langsung destructure dari params
-
+    // Await params untuk mendapatkan accountId
+    const { accountId } = await params;
     const { amount, description } = await req.json();
 
     if (!accountId) {
@@ -40,6 +38,7 @@ export async function POST(
       );
       return withCORS(response, ["POST"], ["Content-Type", "Authorization"]);
     }
+
     if (typeof amount !== "number" || isNaN(amount) || amount <= 0) {
       const response = NextResponse.json(
         { message: "Invalid amount. Must be a positive number." },
@@ -60,6 +59,7 @@ export async function POST(
       );
       return withCORS(response, ["POST"], ["Content-Type", "Authorization"]);
     }
+
     if (account.userId !== userIdFromToken) {
       const response = NextResponse.json(
         { message: "Unauthorized: Account does not belong to you." },

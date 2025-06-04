@@ -3,14 +3,14 @@
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
-import { withCORS, handleCORSPreflight } from "@/lib/cors"; // Import helper CORS
+import { withCORS, handleCORSPreflight } from "@/lib/cors";
 
 const prisma = new PrismaClient();
 
 // --- METHOD: PUT (Update Income) ---
 export async function PUT(
   req: Request,
-  { params }: { params: { incomeId: string } }
+  { params }: { params: Promise<{ incomeId: string }> }
 ) {
   const authHeader = req.headers.get("authorization");
   const token = authHeader?.startsWith("Bearer ")
@@ -31,9 +31,8 @@ export async function PUT(
   const userIdFromToken = authResult.userId;
 
   try {
-    // PERBAIKAN: Hapus 'await' pada params
-    // const awaitedParams = await params;
-    const { incomeId } = params; // Langsung destructure dari params
+    // PERBAIKAN: Await params untuk mendapatkan incomeId
+    const { incomeId } = await params;
 
     const { amount, date, description, source } = await req.json();
 
@@ -185,7 +184,7 @@ export async function PUT(
 // --- METHOD: DELETE (Delete Income) ---
 export async function DELETE(
   req: Request,
-  { params }: { params: { incomeId: string } }
+  { params }: { params: Promise<{ incomeId: string }> }
 ) {
   const authHeader = req.headers.get("authorization");
   const token = authHeader?.startsWith("Bearer ")
@@ -206,9 +205,8 @@ export async function DELETE(
   const userIdFromToken = authResult.userId;
 
   try {
-    // PERBAIKAN: Hapus 'await' pada params
-    // const awaitedParams = await params;
-    const { incomeId } = params; // Langsung destructure dari params
+    // PERBAIKAN: Await params untuk mendapatkan incomeId
+    const { incomeId } = await params;
 
     if (!incomeId) {
       const response = NextResponse.json(
