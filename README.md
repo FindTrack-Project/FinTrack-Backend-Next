@@ -31,7 +31,7 @@ Fintrack Backend API adalah tulang punggung aplikasi manajemen keuangan pribadi 
 
 Semua endpoint API Anda berada di bawah Base URL `https://fintrack-o1bw.vercel.app/api`.
 
-### 7.1. Autentikasi Pengguna
+### 1. Autentikasi Pengguna
 
 #### POST /auth/register - Registrasi Pengguna
 - **Deskripsi**: Mendaftarkan pengguna baru ke sistem dengan akun default pertama
@@ -59,7 +59,7 @@ Semua endpoint API Anda berada di bawah Base URL `https://fintrack-o1bw.vercel.a
 ```
 - **Success Response**: 200 OK, `{ "token": "...", "userId": "...", "name": "..." }`
 
-### 7.2. Manajemen Akun
+### 2. Manajemen Akun
 
 #### POST /accounts - Buat Akun Baru
 - **Deskripsi**: Membuat akun bank/wallet baru untuk pengguna yang terautentikasi
@@ -92,7 +92,7 @@ Semua endpoint API Anda berada di bawah Base URL `https://fintrack-o1bw.vercel.a
 ```
 - **Success Response**: 200 OK
 
-### 7.3. Pengeluaran (Expenses)
+### 3. Pengeluaran (Expenses)
 
 #### POST /expenses - Tambah Pengeluaran
 - **Deskripsi**: Menambahkan entri pengeluaran baru dan menyesuaikan saldo akun terkait
@@ -137,7 +137,7 @@ Semua endpoint API Anda berada di bawah Base URL `https://fintrack-o1bw.vercel.a
 - **URL Params**: `:expenseId` (ID pengeluaran)
 - **Success Response**: 200 OK
 
-### 7.4. Pemasukan (Incomes)
+### 4. Pemasukan (Incomes)
 
 #### POST /incomes - Tambah Pemasukan
 - **Deskripsi**: Menambahkan entri pemasukan baru untuk pengguna yang terautentikasi dan menyesuaikan saldo
@@ -180,7 +180,7 @@ Semua endpoint API Anda berada di bawah Base URL `https://fintrack-o1bw.vercel.a
 - **URL Params**: `:incomeId` (ID pemasukan)
 - **Success Response**: 200 OK
 
-### 7.5. Tujuan Tabungan (Saving Goals)
+### 5. Tujuan Tabungan (Saving Goals)
 
 #### POST /saving-goals - Buat Tujuan Tabungan Baru
 - **Deskripsi**: Membuat tujuan tabungan baru dengan target jumlah
@@ -213,7 +213,7 @@ Semua endpoint API Anda berada di bawah Base URL `https://fintrack-o1bw.vercel.a
 - **Success Response**: 200 OK
 - **Error**: 400 Bad Request ("Insufficient balance in source account..." atau "Allocation amount exceeds..." atau "Saving Goal is already completed.")
 
-### 7.6. Transfer Antar Akun
+### 6. Transfer Antar Akun
 
 #### POST /transfers - Transfer Dana Antar Akun
 - **Deskripsi**: Melakukan transfer dana dari satu akun pengguna ke akun pengguna lainnya
@@ -230,7 +230,7 @@ Semua endpoint API Anda berada di bawah Base URL `https://fintrack-o1bw.vercel.a
 - **Success Response**: 200 OK
 - **Error**: 400 Bad Request ("Insufficient balance in source account..." atau "Source and destination accounts cannot be the same.")
 
-### 7.7. Pengguna (Users)
+### 7. Pengguna (Users)
 
 #### GET /users/balance - Lihat Saldo Total Pengguna
 - **Deskripsi**: Mengambil saldo total terkini pengguna (penjumlahan saldo dari semua akun)
@@ -243,7 +243,7 @@ Semua endpoint API Anda berada di bawah Base URL `https://fintrack-o1bw.vercel.a
 - **URL Params**: `:userId` (ID pengguna)
 - **Success Response**: 200 OK, `{ "user": { "id": "...", "email": "...", "name": "..." } }`
 
-### 7.8. Prediksi Pengeluaran
+### 8. Prediksi Pengeluaran
 
 #### POST /predict-expense - Prediksi Pengeluaran Bulanan
 - **Deskripsi**: Memicu prediksi pengeluaran untuk bulan berikutnya berdasarkan data historis 6 bulan terakhir dari pengguna yang terautentikasi. Hasil prediksi juga disimpan sebagai rekomendasi anggaran
