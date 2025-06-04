@@ -1,40 +1,27 @@
+// src/api/auth/login/route.ts
+
+import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { comparePassword, generateToken } from "@/lib/auth";
+import bcrypt from "bcryptjs";
+import { generateToken } from "@/lib/auth";
+import { withCORS, handleCORSPreflight } from "@/lib/cors";
 
-function addCorsHeaders(response: NextResponse) {
-  response.headers.set("Access-Control-Allow-Origin", "http://localhost:3000");
-  response.headers.set(
-    "Access-Control-Allow-Methods",
-    "GET,POST,PUT,DELETE,OPTIONS"
-  );
-  response.headers.set(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization"
-  );
-  response.headers.set("Access-Control-Allow-Credentials", "true");
-  return response;
-}
+const prisma = new PrismaClient();
 
-export async function OPTIONS() {
-  const response = new NextResponse(null, { status: 204 });
-  return addCorsHeaders(response);
-}
-
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const { email, password } = await request.json();
+    const { email, password } = await req.json();
 
     if (!email || !password) {
       const response = NextResponse.json(
         { message: "Email and password are required" },
         { status: 400 }
       );
-      return addCorsHeaders(response);
+      return withCORS(response, ["POST"], ["Content-Type", "Authorization"]); // Gunakan helper
     }
 
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: email },
     });
 
     if (!user) {
@@ -42,39 +29,50 @@ export async function POST(request: Request) {
         { message: "Invalid credentials" },
         { status: 401 }
       );
-      return addCorsHeaders(response);
+      return withCORS(response, ["POST"], ["Content-Type", "Authorization"]); // Gunakan helper
     }
 
-    const isPasswordValid = await comparePassword(password, user.password);
+    const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
       const response = NextResponse.json(
         { message: "Invalid credentials" },
         { status: 401 }
       );
-      return addCorsHeaders(response);
+      return withCORS(response, ["POST"], ["Content-Type", "Authorization"]); // Gunakan helper
     }
 
     const token = generateToken(user.id);
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password: _, ...userWithoutPassword } = user;
-
     const response = NextResponse.json(
-      { user: userWithoutPassword, token },
+      {
+        message: "Login successful",
+        token: token,
+        userId: user.id,
+        name: user.name,
+      },
       { status: 200 }
     );
-    return addCorsHeaders(response);
+
+    return withCORS(response, ["POST"], ["Content-Type", "Authorization"]); // Gunakan helper
   } catch (error: unknown) {
-    console.error("Login error:", error);
-    let errorMessage = "An unknown error occurred";
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    }
-    const response = NextResponse.json(
-      { message: "Login failed", error: errorMessage },
+    console.error("Error during login:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "An unexpected error occurred";
+    const errorResponse = NextResponse.json(
+      {
+        message: "Failed to login",
+        error: errorMessage,
+      },
       { status: 500 }
     );
-    return addCorsHeaders(response);
+    return withCORS(errorResponse, ["POST"], ["Content-Type", "Authorization"]); // Gunakan helper
+  } finally {
+    await prisma.$disconnect();
   }
+}
+
+// Handle OPTIONS requests for CORS preflight
+export async function OPTIONS() {
+  return handleCORSPreflight(["POST"], ["Content-Type", "Authorization"]); // Gunakan helper
 }

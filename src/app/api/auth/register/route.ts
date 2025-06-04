@@ -6,6 +6,19 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+// --- CORS Headers Configuration ---
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*", // Allow all origins, adjust as needed for production (e.g., specific domains)
+  "Access-Control-Allow-Methods": "POST, OPTIONS", // Allowed methods for this route
+  "Access-Control-Allow-Headers": "Content-Type, Authorization", // Allowed headers
+};
+
+// --- METHOD: OPTIONS (For CORS Preflight Requests) ---
+export async function OPTIONS() {
+  // Respond to CORS preflight requests
+  return NextResponse.json({}, { headers: CORS_HEADERS, status: 200 });
+}
+
 export async function POST(req: Request) {
   try {
     const { email, name, password, initialBalance } = await req.json();
@@ -13,7 +26,7 @@ export async function POST(req: Request) {
     if (!email || !password) {
       return NextResponse.json(
         { message: "Email and password are required" },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS } // Apply CORS headers
       );
     }
 
@@ -24,7 +37,7 @@ export async function POST(req: Request) {
     if (existingUser) {
       return NextResponse.json(
         { message: "User with this email already exists" },
-        { status: 409 }
+        { status: 409, headers: CORS_HEADERS } // Apply CORS headers
       );
     }
 
@@ -35,7 +48,6 @@ export async function POST(req: Request) {
         email: email,
         name: name || null,
         password: hashedPassword,
-        // currentBalance dihapus dari model User
       },
       select: {
         id: true,
@@ -45,7 +57,6 @@ export async function POST(req: Request) {
       },
     });
 
-    // TAMBAH: Buat akun default pertama untuk user baru
     const parsedInitialBalance =
       typeof initialBalance === "number" && !isNaN(initialBalance)
         ? initialBalance
@@ -54,9 +65,9 @@ export async function POST(req: Request) {
     await prisma.account.create({
       data: {
         userId: newUser.id,
-        name: "Main Account", // Atau "Cash", "Primary Wallet"
+        name: "Main Account",
         currentBalance: parsedInitialBalance,
-        type: "General", // Atau "Cash", "Bank", "E-Wallet"
+        type: "General",
       },
     });
 
@@ -69,19 +80,18 @@ export async function POST(req: Request) {
           name: newUser.name,
         },
       },
-      { status: 201 }
+      { status: 201, headers: CORS_HEADERS } // Apply CORS headers
     );
-  } catch (error: unknown) {
+  } catch (error) {
     console.error("Error during user registration:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "An unexpected error occurred";
     return NextResponse.json(
       {
         message: "Failed to register user",
-        error:
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred",
+        error: errorMessage,
       },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS } // Apply CORS headers
     );
   } finally {
     await prisma.$disconnect();

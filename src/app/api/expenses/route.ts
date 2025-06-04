@@ -1,36 +1,44 @@
-// src/api/app/expenses/route.ts
-
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
-// --- METHOD: POST (Tambah Pengeluaran) ---
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: CORS_HEADERS, status: 200 });
+}
+
 export async function POST(req: Request) {
   const authHeader = req.headers.get("authorization");
   const token = authHeader?.split(" ")[1] || "";
   const authResult = verifyToken(token);
   if (!authResult || !authResult.userId) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { message: "Unauthorized" },
+      { status: 401, headers: CORS_HEADERS }
+    );
   }
   const userId = authResult.userId;
 
   try {
-    const { amount, date, description, category, accountId } = await req.json(); // TAMBAH: accountId
+    const { amount, date, description, category, accountId } = await req.json();
 
-    // 1. Validasi Input
     if (typeof amount !== "number" || isNaN(amount) || amount <= 0) {
       return NextResponse.json(
         { message: "Invalid amount. Must be a positive number." },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
     if (!date || !category || !accountId) {
-      // TAMBAH: accountId diperlukan
       return NextResponse.json(
         { message: "Missing required fields: date, category, accountId." },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
 
@@ -38,31 +46,28 @@ export async function POST(req: Request) {
     if (isNaN(parsedDate.getTime())) {
       return NextResponse.json(
         { message: "Invalid date format." },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
 
-    // 2. Cek apakah user ada dan dapatkan akun yang relevan
     const account = await prisma.account.findUnique({
       where: { id: accountId },
-      select: { id: true, userId: true, currentBalance: true }, // Ambil balance akun
+      select: { id: true, userId: true, currentBalance: true },
     });
 
     if (!account) {
       return NextResponse.json(
         { message: "Account not found." },
-        { status: 404 }
+        { status: 404, headers: CORS_HEADERS }
       );
     }
-    // Otorisasi: Pastikan akun ini milik user yang terotentikasi
     if (account.userId !== userId) {
       return NextResponse.json(
         { message: "Unauthorized: Account does not belong to you." },
-        { status: 403 }
+        { status: 403, headers: CORS_HEADERS }
       );
     }
 
-    // 3. Validasi Saldo Akun Tidak Cukup
     if (account.currentBalance < amount) {
       return NextResponse.json(
         {
@@ -71,23 +76,21 @@ export async function POST(req: Request) {
           accountBalance: account.currentBalance,
           expenseAmount: amount,
         },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
 
-    // 4. Buat entri pengeluaran baru
     const newExpense = await prisma.expense.create({
       data: {
         amount: amount,
         date: parsedDate,
         description: description || null,
         userId: userId,
-        accountId: accountId, // Gunakan accountId
+        accountId: accountId,
         category: category,
       },
     });
 
-    // 5. Perbarui currentBalance AKUN (KURANGI SALDO)
     const updatedAccountBalance = account.currentBalance - amount;
 
     await prisma.account.update({
@@ -101,9 +104,9 @@ export async function POST(req: Request) {
       {
         message: "Expense added successfully and account balance updated.",
         expense: newExpense,
-        newAccountBalance: updatedAccountBalance, // Kembalikan saldo akun yang baru
+        newAccountBalance: updatedAccountBalance,
       },
-      { status: 201 }
+      { status: 201, headers: CORS_HEADERS }
     );
   } catch (error: unknown) {
     console.error("Error adding expense or updating account balance:", error);
@@ -115,7 +118,7 @@ export async function POST(req: Request) {
             ? error.message
             : "An unexpected error occurred.",
       },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   } finally {
     await prisma.$disconnect();
@@ -126,7 +129,10 @@ export async function GET(req: Request) {
   const token = authHeader?.split(" ")[1] || "";
   const authResult = verifyToken(token);
   if (!authResult || !authResult.userId) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { message: "Unauthorized" },
+      { status: 401, headers: CORS_HEADERS }
+    );
   }
   const userId = authResult.userId;
 
@@ -136,7 +142,10 @@ export async function GET(req: Request) {
       orderBy: { date: "desc" },
     });
 
-    return NextResponse.json({ expenses }, { status: 200 });
+    return NextResponse.json(
+      { expenses },
+      { status: 200, headers: CORS_HEADERS }
+    );
   } catch (error: unknown) {
     console.error("Error fetching expenses:", error);
     return NextResponse.json(
@@ -147,7 +156,7 @@ export async function GET(req: Request) {
             ? error.message
             : "An unexpected error occurred",
       },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   } finally {
     await prisma.$disconnect();

@@ -6,6 +6,18 @@ import { verifyToken } from "@/lib/auth"; // Import utilitas verifikasi JWT
 
 const prisma = new PrismaClient();
 
+// --- CORS Headers Configuration ---
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*", // Allow all origins, adjust as needed for production (e.g., specific domains)
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS", // Allowed methods
+  "Access-Control-Allow-Headers": "Content-Type, Authorization", // Allowed headers
+};
+
+// --- METHOD: OPTIONS (For CORS Preflight Requests) ---
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: CORS_HEADERS, status: 200 });
+}
+
 // --- METHOD: POST (Buat Akun Baru) ---
 export async function POST(req: Request) {
   // 1. Verifikasi Token & Dapatkan userId
@@ -17,7 +29,7 @@ export async function POST(req: Request) {
   if (!authResult || !authResult.userId) {
     return NextResponse.json(
       { message: "Invalid or missing token." },
-      { status: 401 }
+      { status: 401, headers: CORS_HEADERS }
     );
   }
   const userId = authResult.userId; // Dapatkan userId dari token!
@@ -29,7 +41,7 @@ export async function POST(req: Request) {
     if (!name || typeof name !== "string" || name.trim() === "") {
       return NextResponse.json(
         { message: "Account name is required and must be a non-empty string." },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
     // initialBalance bisa opsional dan default 0, tapi cek tipenya jika ada
@@ -47,7 +59,7 @@ export async function POST(req: Request) {
     if (!userExists) {
       return NextResponse.json(
         { message: "User not found for this token." },
-        { status: 404 }
+        { status: 404, headers: CORS_HEADERS }
       );
     }
 
@@ -74,7 +86,7 @@ export async function POST(req: Request) {
         message: "Account created successfully.",
         account: newAccount,
       },
-      { status: 201 }
+      { status: 201, headers: CORS_HEADERS }
     );
   } catch (error: unknown) {
     console.error("Error creating account:", error);
@@ -86,7 +98,7 @@ export async function POST(req: Request) {
             ? error.message
             : "An unexpected error occurred.",
       },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   } finally {
     await prisma.$disconnect();
@@ -104,7 +116,7 @@ export async function GET(req: Request) {
   if (!authResult || !authResult.userId) {
     return NextResponse.json(
       { message: "Invalid or missing token." },
-      { status: 401 }
+      { status: 401, headers: CORS_HEADERS }
     );
   }
   const userId = authResult.userId; // Dapatkan userId dari token!
@@ -119,7 +131,7 @@ export async function GET(req: Request) {
     if (!userExists) {
       return NextResponse.json(
         { message: "User not found for this token." },
-        { status: 404 }
+        { status: 404, headers: CORS_HEADERS }
       );
     }
 
@@ -129,7 +141,10 @@ export async function GET(req: Request) {
       orderBy: { name: "asc" }, // Urutkan berdasarkan nama
     });
 
-    return NextResponse.json({ accounts }, { status: 200 });
+    return NextResponse.json(
+      { accounts },
+      { status: 200, headers: CORS_HEADERS }
+    );
   } catch (error: unknown) {
     console.error("Error fetching accounts:", error);
     return NextResponse.json(
@@ -140,7 +155,7 @@ export async function GET(req: Request) {
             ? error.message
             : "An unexpected error occurred.",
       },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   } finally {
     await prisma.$disconnect();

@@ -1,30 +1,36 @@
-// src/api/app/incomes/[incomeId]/route.ts
-
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { verifyToken } from "@/lib/auth"; // Pastikan ini adalah utilitas verifyToken yang benar
+import { verifyToken } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
-// --- METHOD: PUT (Update Income) ---
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: CORS_HEADERS, status: 200 });
+}
+
 export async function PUT(
   req: Request,
   { params }: { params: { incomeId: string } }
 ) {
-  // 1. Verifikasi Token & Dapatkan userId (menggunakan utilitas yang konsisten)
   const authHeader = req.headers.get("authorization");
-  const token = authHeader?.split(" ")[1]; // Expecting "Bearer <token>"
+  const token = authHeader?.split(" ")[1];
   if (!token) {
     return NextResponse.json(
       { message: "Authorization token missing." },
-      { status: 401 }
+      { status: 401, headers: CORS_HEADERS }
     );
   }
   const authResult = verifyToken(token);
   if (!authResult || !authResult.userId) {
     return NextResponse.json(
       { message: "Invalid or expired token." },
-      { status: 401 }
+      { status: 401, headers: CORS_HEADERS }
     );
   }
   const userIdFromToken = authResult.userId;
@@ -33,51 +39,51 @@ export async function PUT(
     const awaitedParams = await params;
     const { incomeId } = awaitedParams;
 
-    const { amount, date, description, source } = await req.json(); // 2. Validasi Input
+    const { amount, date, description, source } = await req.json();
 
     if (!incomeId) {
       return NextResponse.json(
         { message: "Income ID is required." },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
     if (typeof amount !== "number" || isNaN(amount) || amount <= 0) {
       return NextResponse.json(
         { message: "Invalid amount. Must be a positive number." },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
     if (!date || !source) {
       return NextResponse.json(
         { message: "Missing required fields: date, source." },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
     const parsedDate = new Date(date);
     if (isNaN(parsedDate.getTime())) {
       return NextResponse.json(
         { message: "Invalid date format." },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
-    } // 3. Cari Income yang akan diupdate & Verifikasi Kepemilikan & Dapatkan accountId-nya
+    }
 
     const existingIncome = await prisma.income.findUnique({
       where: { id: incomeId },
-      select: { id: true, userId: true, amount: true, accountId: true }, // Ambil accountId dan amount lama
+      select: { id: true, userId: true, amount: true, accountId: true },
     });
 
     if (!existingIncome) {
       return NextResponse.json(
         { message: "Income not found." },
-        { status: 404 }
+        { status: 404, headers: CORS_HEADERS }
       );
-    } // Otorisasi: Pastikan income ini milik user yang terotentikasi
+    }
     if (existingIncome.userId !== userIdFromToken) {
       return NextResponse.json(
         { message: "Unauthorized: You do not own this income." },
-        { status: 403 }
+        { status: 403, headers: CORS_HEADERS }
       );
-    } // 4. Dapatkan Akun yang Terkait (untuk update saldo)
+    }
 
     const account = await prisma.account.findUnique({
       where: { id: existingIncome.accountId },
@@ -87,18 +93,18 @@ export async function PUT(
     if (!account) {
       return NextResponse.json(
         { message: "Associated account not found." },
-        { status: 404 }
+        { status: 404, headers: CORS_HEADERS }
       );
-    } // 5. Perbarui currentBalance AKUN (BUKAN USER)
+    }
 
     const oldAmount = existingIncome.amount;
-    const amountDifference = amount - oldAmount; // Selisih baru - lama
-    const updatedAccountBalance = account.currentBalance + amountDifference; // Tambahkan selisih ke saldo akun
+    const amountDifference = amount - oldAmount;
+    const updatedAccountBalance = account.currentBalance + amountDifference;
 
     await prisma.account.update({
       where: { id: account.id },
       data: { currentBalance: updatedAccountBalance },
-    }); // 6. Perbarui Income
+    });
 
     const updatedIncome = await prisma.income.update({
       where: { id: incomeId },
@@ -114,12 +120,11 @@ export async function PUT(
       {
         message: "Income updated successfully and account balance adjusted.",
         income: updatedIncome,
-        newAccountBalance: updatedAccountBalance, // Kembalikan saldo akun yang baru
+        newAccountBalance: updatedAccountBalance,
       },
-      { status: 200 }
+      { status: 200, headers: CORS_HEADERS }
     );
   } catch (error: unknown) {
-    // Menggunakan 'unknown' untuk konsistensi penanganan error
     console.error("Error updating income:", error);
     let errorMessage = "An unexpected error occurred.";
     if (error instanceof Error) {
@@ -130,64 +135,62 @@ export async function PUT(
         message: "Failed to update income.",
         error: errorMessage,
       },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   } finally {
     await prisma.$disconnect();
   }
 }
 
-// --- METHOD: DELETE (Delete Income) ---
 export async function DELETE(
   req: Request,
   { params }: { params: { incomeId: string } }
 ) {
-  // 1. Verifikasi Token & Dapatkan userId (menggunakan utilitas yang konsisten)
   const authHeader = req.headers.get("authorization");
-  const token = authHeader?.split(" ")[1]; // Expecting "Bearer <token>"
+  const token = authHeader?.split(" ")[1];
   if (!token) {
     return NextResponse.json(
       { message: "Authorization token missing." },
-      { status: 401 }
+      { status: 401, headers: CORS_HEADERS }
     );
   }
   const authResult = verifyToken(token);
   if (!authResult || !authResult.userId) {
     return NextResponse.json(
       { message: "Invalid or expired token." },
-      { status: 401 }
+      { status: 401, headers: CORS_HEADERS }
     );
   }
   const userIdFromToken = authResult.userId;
 
   try {
     const awaitedParams = await params;
-    const { incomeId } = awaitedParams; // 2. Validasi Input
+    const { incomeId } = awaitedParams;
 
     if (!incomeId) {
       return NextResponse.json(
         { message: "Income ID is required." },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
-    } // 3. Cari Income yang akan dihapus & Verifikasi Kepemilikan & Dapatkan accountId-nya
+    }
 
     const existingIncome = await prisma.income.findUnique({
       where: { id: incomeId },
-      select: { id: true, userId: true, amount: true, accountId: true }, // Ambil accountId dan amount
+      select: { id: true, userId: true, amount: true, accountId: true },
     });
 
     if (!existingIncome) {
       return NextResponse.json(
         { message: "Income not found." },
-        { status: 404 }
+        { status: 404, headers: CORS_HEADERS }
       );
-    } // Otorisasi: Pastikan income ini milik user yang terotentikasi
+    }
     if (existingIncome.userId !== userIdFromToken) {
       return NextResponse.json(
         { message: "Unauthorized: You do not own this income." },
-        { status: 403 }
+        { status: 403, headers: CORS_HEADERS }
       );
-    } // 4. Dapatkan Akun yang Terkait (untuk update saldo)
+    }
 
     const account = await prisma.account.findUnique({
       where: { id: existingIncome.accountId },
@@ -197,16 +200,16 @@ export async function DELETE(
     if (!account) {
       return NextResponse.json(
         { message: "Associated account not found." },
-        { status: 404 }
+        { status: 404, headers: CORS_HEADERS }
       );
-    } // 5. Hapus Income
+    }
 
     await prisma.income.delete({
       where: { id: incomeId },
-    }); // 6. Perbarui currentBalance AKUN (KURANGI kembali amount yang dihapus)
+    });
 
     const amountToDeduct = existingIncome.amount;
-    const updatedAccountBalance = account.currentBalance - amountToDeduct; // Kurangi jumlah yang dihapus dari saldo akun
+    const updatedAccountBalance = account.currentBalance - amountToDeduct;
 
     await prisma.account.update({
       where: { id: account.id },
@@ -218,10 +221,9 @@ export async function DELETE(
         message: "Income deleted successfully and account balance adjusted.",
         newAccountBalance: updatedAccountBalance,
       },
-      { status: 200 }
+      { status: 200, headers: CORS_HEADERS }
     );
   } catch (error: unknown) {
-    // Menggunakan 'unknown' untuk konsistensi penanganan error
     console.error("Error deleting income:", error);
     let errorMessage = "An unexpected error occurred.";
     if (error instanceof Error) {
@@ -232,7 +234,7 @@ export async function DELETE(
         message: "Failed to delete income.",
         error: errorMessage,
       },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   } finally {
     await prisma.$disconnect();
