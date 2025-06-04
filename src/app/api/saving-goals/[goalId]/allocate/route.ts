@@ -1,17 +1,23 @@
-// src/api/app/saving-goals/[goalId]/allocate/route.ts
-
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { verifyToken } from "@/lib/auth"; // Import JWT verification utility
+import { verifyToken } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
-// --- METHOD: POST (Allocate Funds to Saving Goal) ---
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: CORS_HEADERS, status: 200 });
+}
+
 export async function POST(
   req: Request,
   { params }: { params: { goalId: string } }
 ) {
-  // 1. Verify Token & Get userId
   const authHeader = req.headers.get("authorization");
   const token = authHeader?.startsWith("Bearer ")
     ? authHeader.slice(7)
@@ -20,28 +26,27 @@ export async function POST(
   if (!payload) {
     return NextResponse.json(
       { message: "Invalid or missing token." },
-      { status: 401 }
+      { status: 401, headers: CORS_HEADERS }
     );
   }
-  const userIdFromToken = payload.userId; // Get userId from token!
+  const userIdFromToken = payload.userId;
 
   try {
     const awaitedParams = await params;
-    const { goalId } = awaitedParams; // Get goalId from URL parameters
+    const { goalId } = awaitedParams;
 
-    const { amount, accountId } = await req.json(); // Get allocation amount and source account ID from body
+    const { amount, accountId } = await req.json();
 
-    // 2. Input Validation
     if (!goalId) {
       return NextResponse.json(
         { message: "Saving Goal ID is required." },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
     if (!accountId) {
       return NextResponse.json(
         { message: "Source Account ID is required." },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
     if (typeof amount !== "number" || isNaN(amount) || amount <= 0) {
@@ -50,11 +55,10 @@ export async function POST(
           message:
             "Allocation amount is required and must be a positive number.",
         },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
 
-    // 3. Find Saving Goal and Verify Ownership
     const savingGoal = await prisma.savingGoal.findUnique({
       where: { id: goalId },
     });
@@ -62,13 +66,13 @@ export async function POST(
     if (!savingGoal) {
       return NextResponse.json(
         { message: "Saving Goal not found." },
-        { status: 404 }
+        { status: 404, headers: CORS_HEADERS }
       );
     }
     if (savingGoal.userId !== userIdFromToken) {
       return NextResponse.json(
         { message: "Unauthorized: You do not own this saving goal." },
-        { status: 403 }
+        { status: 403, headers: CORS_HEADERS }
       );
     }
     if (savingGoal.isCompleted) {
@@ -77,7 +81,7 @@ export async function POST(
           message:
             "Saving Goal is already completed. Cannot allocate more funds.",
         },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
     if (savingGoal.currentSavedAmount + amount > savingGoal.targetAmount) {
@@ -91,11 +95,10 @@ export async function POST(
           remainingTarget:
             savingGoal.targetAmount - savingGoal.currentSavedAmount,
         },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
 
-    // 4. Find Source Account and Verify Ownership & Balance
     const sourceAccount = await prisma.account.findUnique({
       where: { id: accountId },
     });
@@ -103,13 +106,13 @@ export async function POST(
     if (!sourceAccount) {
       return NextResponse.json(
         { message: "Source Account not found." },
-        { status: 404 }
+        { status: 404, headers: CORS_HEADERS }
       );
     }
     if (sourceAccount.userId !== userIdFromToken) {
       return NextResponse.json(
         { message: "Unauthorized: Source account does not belong to you." },
-        { status: 403 }
+        { status: 403, headers: CORS_HEADERS }
       );
     }
     if (sourceAccount.currentBalance < amount) {
@@ -119,25 +122,20 @@ export async function POST(
           accountBalance: sourceAccount.currentBalance,
           allocationAmount: amount,
         },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
 
-    // 5. Perform the Allocation (Update Account and Saving Goal)
-    // Use a Prisma transaction to ensure atomicity
     const [updatedSourceAccount, updatedSavingGoal] = await prisma.$transaction(
       [
-        // Deduct amount from source account
         prisma.account.update({
           where: { id: sourceAccount.id },
           data: { currentBalance: sourceAccount.currentBalance - amount },
         }),
-        // Add amount to saving goal
         prisma.savingGoal.update({
           where: { id: savingGoal.id },
           data: {
             currentSavedAmount: savingGoal.currentSavedAmount + amount,
-            // Check if goal is completed after this allocation
             isCompleted:
               savingGoal.currentSavedAmount + amount >= savingGoal.targetAmount,
           },
@@ -152,7 +150,7 @@ export async function POST(
         updatedSavingGoalAmount: updatedSavingGoal.currentSavedAmount,
         isGoalCompleted: updatedSavingGoal.isCompleted,
       },
-      { status: 200 }
+      { status: 200, headers: CORS_HEADERS }
     );
   } catch (error: unknown) {
     console.error("Error allocating funds to saving goal:", error);
@@ -164,7 +162,7 @@ export async function POST(
             ? error.message
             : "An unexpected error occurred.",
       },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   } finally {
     await prisma.$disconnect();

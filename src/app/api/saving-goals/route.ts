@@ -1,36 +1,41 @@
-// src/api/app/saving-goals/route.ts
-
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { verifyToken } from "@/lib/auth"; // Import utilitas verifikasi JWT
+import { verifyToken } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
-// --- METHOD: POST (Buat Tujuan Tabungan Baru) ---
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: CORS_HEADERS, status: 200 });
+}
+
 export async function POST(req: Request) {
-  // 1. Verifikasi Token & Dapatkan userId
   const authHeader = req.headers.get("authorization");
   const token = authHeader?.split(" ")[1] || "";
   const authResult = verifyToken(token);
   if (!authResult || !authResult.userId) {
     return NextResponse.json(
       { message: "Invalid or missing authentication token." },
-      { status: 401 }
+      { status: 401, headers: CORS_HEADERS }
     );
   }
-  const userId = authResult.userId; // Dapatkan userId dari token!
+  const userId = authResult.userId;
 
   try {
     const { name, targetAmount } = await req.json();
 
-    // 2. Validasi Input
     if (!name || typeof name !== "string" || name.trim() === "") {
       return NextResponse.json(
         {
           message:
             "Saving goal name is required and must be a non-empty string.",
         },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
     if (
@@ -40,11 +45,10 @@ export async function POST(req: Request) {
     ) {
       return NextResponse.json(
         { message: "Target amount is required and must be a positive number." },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
 
-    // Cek user existence (opsional, tapi baik untuk memastikan)
     const userExists = await prisma.user.findUnique({
       where: { id: userId },
       select: { id: true },
@@ -53,11 +57,10 @@ export async function POST(req: Request) {
     if (!userExists) {
       return NextResponse.json(
         { message: "User not found for this token." },
-        { status: 404 }
+        { status: 404, headers: CORS_HEADERS }
       );
     }
 
-    // 3. Buat Tujuan Tabungan Baru
     const newSavingGoal = await prisma.savingGoal.create({
       data: {
         userId: userId,
@@ -67,7 +70,6 @@ export async function POST(req: Request) {
         isCompleted: false,
       },
       select: {
-        // Hanya kembalikan data yang relevan
         id: true,
         name: true,
         targetAmount: true,
@@ -82,7 +84,7 @@ export async function POST(req: Request) {
         message: "Saving goal created successfully.",
         savingGoal: newSavingGoal,
       },
-      { status: 201 }
+      { status: 201, headers: CORS_HEADERS }
     );
   } catch (error: unknown) {
     console.error("Error creating saving goal:", error);
@@ -94,29 +96,26 @@ export async function POST(req: Request) {
             ? error.message
             : "An unexpected error occurred.",
       },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   } finally {
     await prisma.$disconnect();
   }
 }
 
-// --- METHOD: GET (Lihat Semua Tujuan Tabungan Pengguna) ---
 export async function GET(req: Request) {
-  // 1. Verifikasi Token & Dapatkan userId
   const authHeader = req.headers.get("authorization");
   const token = authHeader?.split(" ")[1] || "";
   const authResult = verifyToken(token);
   if (!authResult || !authResult.userId) {
     return NextResponse.json(
       { message: "Invalid or missing authentication token." },
-      { status: 401 }
+      { status: 401, headers: CORS_HEADERS }
     );
   }
-  const userId = authResult.userId; // Dapatkan userId dari token!
+  const userId = authResult.userId;
 
   try {
-    // Cek user existence (opsional)
     const userExists = await prisma.user.findUnique({
       where: { id: userId },
       select: { id: true },
@@ -125,17 +124,19 @@ export async function GET(req: Request) {
     if (!userExists) {
       return NextResponse.json(
         { message: "User not found for this token." },
-        { status: 404 }
+        { status: 404, headers: CORS_HEADERS }
       );
     }
 
-    // 2. Ambil semua tujuan tabungan milik pengguna
     const savingGoals = await prisma.savingGoal.findMany({
       where: { userId: userId },
-      orderBy: { createdAt: "asc" }, // Urutkan berdasarkan tanggal dibuat
+      orderBy: { createdAt: "asc" },
     });
 
-    return NextResponse.json({ savingGoals }, { status: 200 });
+    return NextResponse.json(
+      { savingGoals },
+      { status: 200, headers: CORS_HEADERS }
+    );
   } catch (error: unknown) {
     console.error("Error fetching saving goals:", error);
     return NextResponse.json(
@@ -146,7 +147,7 @@ export async function GET(req: Request) {
             ? error.message
             : "An unexpected error occurred.",
       },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   } finally {
     await prisma.$disconnect();

@@ -1,14 +1,20 @@
-// src/api/app/transfers/route.ts
-
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { verifyToken } from "@/lib/auth"; // Import JWT verification utility
+import { verifyToken } from "@/lib/auth";
 
 const prisma = new PrismaClient();
 
-// --- METHOD: POST (Transfer Dana Antar Akun) ---
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: CORS_HEADERS, status: 200 });
+}
+
 export async function POST(req: Request) {
-  // 1. Verifikasi Token & Dapatkan userId
   const authHeader = req.headers.get("authorization");
   const token = authHeader?.startsWith("Bearer ")
     ? authHeader.slice(7)
@@ -17,16 +23,15 @@ export async function POST(req: Request) {
   if (!payload) {
     return NextResponse.json(
       { message: "Invalid or missing token." },
-      { status: 401 }
+      { status: 401, headers: CORS_HEADERS }
     );
   }
-  const userIdFromToken = payload.userId; // Dapatkan userId dari token!
+  const userIdFromToken = payload.userId;
 
   try {
     const { sourceAccountId, destinationAccountId, amount, description } =
       await req.json();
 
-    // 2. Validasi Input Dasar
     if (
       !sourceAccountId ||
       !destinationAccountId ||
@@ -39,7 +44,7 @@ export async function POST(req: Request) {
           message:
             "Missing required fields (sourceAccountId, destinationAccountId, amount) or invalid amount.",
         },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
 
@@ -48,11 +53,10 @@ export async function POST(req: Request) {
         {
           message: "Source and destination accounts cannot be the same.",
         },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
 
-    // 3. Cari Akun Sumber dan Tujuan & Verifikasi Kepemilikan
     const [sourceAccount, destinationAccount] = await Promise.all([
       prisma.account.findUnique({ where: { id: sourceAccountId } }),
       prisma.account.findUnique({ where: { id: destinationAccountId } }),
@@ -61,21 +65,20 @@ export async function POST(req: Request) {
     if (!sourceAccount) {
       return NextResponse.json(
         { message: "Source account not found." },
-        { status: 404 }
+        { status: 404, headers: CORS_HEADERS }
       );
     }
     if (!destinationAccount) {
       return NextResponse.json(
         { message: "Destination account not found." },
-        { status: 404 }
+        { status: 404, headers: CORS_HEADERS }
       );
     }
 
-    // Otorisasi: Pastikan kedua akun milik pengguna yang terotentikasi
     if (sourceAccount.userId !== userIdFromToken) {
       return NextResponse.json(
         { message: "Unauthorized: Source account does not belong to you." },
-        { status: 403 }
+        { status: 403, headers: CORS_HEADERS }
       );
     }
     if (destinationAccount.userId !== userIdFromToken) {
@@ -83,11 +86,10 @@ export async function POST(req: Request) {
         {
           message: "Unauthorized: Destination account does not belong to you.",
         },
-        { status: 403 }
+        { status: 403, headers: CORS_HEADERS }
       );
     }
 
-    // 4. Cek Saldo Akun Sumber
     if (sourceAccount.currentBalance < amount) {
       return NextResponse.json(
         {
@@ -95,29 +97,21 @@ export async function POST(req: Request) {
           accountBalance: sourceAccount.currentBalance,
           transferAmount: amount,
         },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
 
-    // 5. Lakukan Transfer (Operasi Atomik Menggunakan Prisma Transaction)
-    // Ini memastikan bahwa kedua update berhasil atau keduanya gagal
     const [updatedSourceAccount, updatedDestinationAccount] =
       await prisma.$transaction([
-        // Kurangi dari akun sumber
         prisma.account.update({
           where: { id: sourceAccountId },
           data: { currentBalance: sourceAccount.currentBalance - amount },
         }),
-        // Tambah ke akun tujuan
         prisma.account.update({
           where: { id: destinationAccountId },
           data: { currentBalance: destinationAccount.currentBalance + amount },
         }),
       ]);
-
-    // Opsional: Anda bisa merekam transfer ini sebagai sebuah transaksi internal
-    // Misalnya, membuat model 'TransferTransaction' jika ingin audit trail yang lebih detail.
-    // Untuk saat ini, kita hanya update saldo akun.
 
     return NextResponse.json(
       {
@@ -132,7 +126,7 @@ export async function POST(req: Request) {
             updatedDestinationAccount.currentBalance,
         },
       },
-      { status: 200 }
+      { status: 200, headers: CORS_HEADERS }
     );
   } catch (error: unknown) {
     console.error("Error during transfer:", error);
@@ -144,7 +138,7 @@ export async function POST(req: Request) {
             ? error.message
             : "An unexpected error occurred.",
       },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   } finally {
     await prisma.$disconnect();

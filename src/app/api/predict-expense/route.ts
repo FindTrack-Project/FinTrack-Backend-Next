@@ -1,15 +1,26 @@
-// src/api/app/predict-expense/route.ts
-
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { verifyToken } from "@/lib/auth";
+
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: CORS_HEADERS, status: 200 });
+}
 
 export async function POST(request: Request) {
   const authHeader = request.headers.get("authorization");
   const token = authHeader?.split(" ")[1] || "";
   const authResult = verifyToken(token);
   if (!authResult) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401, headers: CORS_HEADERS }
+    );
   }
   const userId = authResult.userId;
 
@@ -77,7 +88,7 @@ export async function POST(request: Request) {
           message:
             "No historical expenses found for prediction. Returning default budget.",
         },
-        { status: 200 }
+        { status: 200, headers: CORS_HEADERS }
       );
     }
 
@@ -91,7 +102,7 @@ export async function POST(request: Request) {
           error:
             "Failed to retrieve sufficient historical data for prediction (expected 6 months).",
         },
-        { status: 500 }
+        { status: 500, headers: CORS_HEADERS }
       );
     }
 
@@ -111,7 +122,10 @@ export async function POST(request: Request) {
     if (!flaskResponse.ok) {
       const errorData = await flaskResponse.json();
       console.error("Error from Flask API:", errorData);
-      return NextResponse.json(errorData, { status: flaskResponse.status });
+      return NextResponse.json(errorData, {
+        status: flaskResponse.status,
+        headers: CORS_HEADERS,
+      });
     }
 
     const predictionData = await flaskResponse.json();
@@ -171,7 +185,10 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json(predictionData, { status: 200 });
+    return NextResponse.json(predictionData, {
+      status: 200,
+      headers: CORS_HEADERS,
+    });
   } catch (error: unknown) {
     console.error("Error in predict-expense API route:", error);
     return NextResponse.json(
@@ -179,7 +196,7 @@ export async function POST(request: Request) {
         error: "Internal server error: Failed to process request.",
         details: error instanceof Error ? error.message : "No details",
       },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   } finally {
     await prisma.$disconnect();
