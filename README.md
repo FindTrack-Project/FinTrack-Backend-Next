@@ -26,7 +26,6 @@ Fintrack Backend API adalah tulang punggung aplikasi manajemen keuangan pribadi 
 - **Autentikasi**: JWT (jsonwebtoken), bcryptjs
 - **Integrasi ML**: Interaksi dengan Flask API eksternal (membutuhkan Flask API terpisah untuk fitur prediksi)
 
-
 ## Dokumentasi API Endpoints
 
 Semua endpoint API Anda berada di bawah Base URL `https://fintrack-o1bw.vercel.app/api`.
@@ -34,70 +33,169 @@ Semua endpoint API Anda berada di bawah Base URL `https://fintrack-o1bw.vercel.a
 ### 1. Autentikasi Pengguna
 
 #### POST /auth/register - Registrasi Pengguna
+
 - **Deskripsi**: Mendaftarkan pengguna baru ke sistem dengan akun default pertama
 - **Autentikasi**: Tidak diperlukan
 - **Request Body (JSON)**:
+
 ```json
 {
   "email": "user.baru@example.com",
   "name": "Nama Pengguna",
   "password": "kataSandiAman123",
-  "initialBalance": 0.00
+  "initialBalance": 0.0
 }
 ```
+
 - **Success Response**: 201 Created
 
 #### POST /auth/login - Login Pengguna
+
 - **Deskripsi**: Mengautentikasi pengguna dan mengembalikan token JWT
 - **Autentikasi**: Tidak diperlukan
 - **Request Body (JSON)**:
+
 ```json
 {
   "email": "user.test@example.com",
   "password": "strongPassword123"
 }
 ```
+
 - **Success Response**: 200 OK, `{ "token": "...", "userId": "...", "name": "..." }`
 
 ### 2. Manajemen Akun
 
 #### POST /accounts - Buat Akun Baru
-- **Deskripsi**: Membuat akun bank/wallet baru untuk pengguna yang terautentikasi
-- **Autentikasi**: JWT Required
+
+- **Deskripsi**: Membuat akun bank/wallet baru untuk pengguna yang terautentikasi.
+- **Autentikasi**: JWT Required (Header: `Authorization: Bearer <token>`)
 - **Request Body (JSON)**:
-```json
-{
-  "name": "BCA Savings",
-  "initialBalance": 1000000.00,
-  "type": "Bank"
-}
-```
-- **Success Response**: 201 Created
+  ```json
+  {
+    "name": "BCA Savings",
+    "initialBalance": 1000000.0,
+    "type": "Bank"
+  }
+  ```
+- **Success Response**:
+  - **Status**: 201 Created
+  - **Body**:
+    ```json
+    {
+      "message": "Account created successfully.",
+      "account": {
+        "id": "account_id",
+        "name": "BCA Savings",
+        "currentBalance": 1000000,
+        "type": "Bank",
+        "createdAt": "2025-06-12T10:00:00.000Z"
+      }
+    }
+    ```
+- **Error Response**:
+  - **Status**: 400/401/404/500
+  - **Body**:
+    ```json
+    {
+      "message": "Account name is required and must be a non-empty string."
+    }
+    ```
 
 #### GET /accounts - Lihat Semua Akun Pengguna
-- **Deskripsi**: Mengambil semua akun keuangan milik pengguna yang terautentikasi
-- **Autentikasi**: JWT Required
-- **Success Response**: 200 OK, `{ "accounts": [...] }`
 
-#### POST /accounts/:accountId/deposit - Deposit Langsung ke Akun
-- **Deskripsi**: Melakukan setoran dana langsung ke akun spesifik pengguna. Ini digunakan untuk top-up atau penambahan dana yang tidak ingin dicatat sebagai pemasukan umum
+- **Deskripsi**: Mengambil semua akun keuangan milik pengguna yang terautentikasi.
 - **Autentikasi**: JWT Required
-- **URL Params**: `:accountId` (ID akun)
+- **Success Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "message": "Accounts fetched successfully.",
+      "accounts": [
+        {
+          "id": "account_id",
+          "name": "BCA Savings",
+          "currentBalance": 1000000,
+          "type": "Bank",
+          "createdAt": "2025-06-12T10:00:00.000Z"
+        }
+      ]
+    }
+    ```
+
+#### PUT /accounts - Update Akun
+
+- **Deskripsi**: Memperbarui data akun milik pengguna.
+- **Autentikasi**: JWT Required
 - **Request Body (JSON)**:
-```json
-{
-  "amount": 100000.00,
-  "description": "Top-up dari bank lain"
-}
-```
-- **Success Response**: 200 OK
+  ```json
+  {
+    "id": "account_id",
+    "name": "Tabungan Mandiri",
+    "currentBalance": 2000000,
+    "type": "Bank"
+  }
+  ```
+- **Success Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "message": "Account updated successfully.",
+      "account": {
+        "id": "account_id",
+        "name": "Tabungan Mandiri",
+        "currentBalance": 2000000,
+        "type": "Bank",
+        "createdAt": "2025-06-12T10:00:00.000Z"
+      }
+    }
+    ```
+- **Error Response**:
+  - **Status**: 404/400/500
+  - **Body**:
+    ```json
+    {
+      "message": "Account not found or not owned by user."
+    }
+    ```
+
+#### DELETE /accounts - Hapus Akun
+
+- **Deskripsi**: Menghapus akun milik pengguna.
+- **Autentikasi**: JWT Required
+- **Request Body (JSON)**:
+  ```json
+  {
+    "id": "account_id"
+  }
+  ```
+- **Success Response**:
+  - **Status**: 200 OK
+  - **Body**:
+    ```json
+    {
+      "message": "Account deleted successfully."
+    }
+    ```
+- **Error Response**:
+  - **Status**: 404/400/500
+  - **Body**:
+    ```json
+    {
+      "message": "Account not found or not owned by user."
+    }
+    ```
 
 ### 3. Pengeluaran (Expenses)
 
 #### POST /expenses - Tambah Pengeluaran
+
 - **Deskripsi**: Menambahkan entri pengeluaran baru dan menyesuaikan saldo akun terkait
 - **Autentikasi**: JWT Required
 - **Request Body (JSON)**:
+
 ```json
 {
   "amount": 50.75,
@@ -107,31 +205,37 @@ Semua endpoint API Anda berada di bawah Base URL `https://fintrack-o1bw.vercel.a
   "accountId": "YOUR_ACCOUNT_ID"
 }
 ```
+
 - **Success Response**: 201 Created
 - **Error**: 400 Bad Request ("Insufficient balance in selected account.")
 
 #### GET /expenses - Lihat Semua Pengeluaran
+
 - **Deskripsi**: Mengambil semua entri pengeluaran untuk pengguna yang terautentikasi
 - **Autentikasi**: JWT Required
 - **Success Response**: 200 OK, `{ "expenses": [...] }`
 
 #### PUT /expenses/:expenseId - Update Pengeluaran Berdasarkan ID
+
 - **Deskripsi**: Memperbarui detail pengeluaran dan menyesuaikan saldo akun terkait
 - **Autentikasi**: JWT Required
 - **URL Params**: `:expenseId` (ID pengeluaran)
 - **Request Body (JSON)**:
+
 ```json
 {
-  "amount": 60.00,
+  "amount": 60.0,
   "date": "2025-06-02T14:30:00Z",
   "description": "Makan siang (revisi)",
   "category": "Food"
 }
 ```
+
 - **Success Response**: 200 OK
 - **Error**: 400 Bad Request ("Insufficient balance in account to increase expense amount.")
 
 #### DELETE /expenses/:expenseId - Hapus Pengeluaran Berdasarkan ID
+
 - **Deskripsi**: Menghapus entri pengeluaran dan menyesuaikan saldo
 - **Autentikasi**: JWT Required
 - **URL Params**: `:expenseId` (ID pengeluaran)
@@ -140,41 +244,49 @@ Semua endpoint API Anda berada di bawah Base URL `https://fintrack-o1bw.vercel.a
 ### 4. Pemasukan (Incomes)
 
 #### POST /incomes - Tambah Pemasukan
+
 - **Deskripsi**: Menambahkan entri pemasukan baru untuk pengguna yang terautentikasi dan menyesuaikan saldo
 - **Autentikasi**: JWT Required
 - **Request Body (JSON)**:
+
 ```json
 {
-  "amount": 500.00,
+  "amount": 500.0,
   "date": "2025-06-01T09:00:00Z",
   "description": "Pembayaran gaji",
   "source": "Salary",
   "accountId": "YOUR_ACCOUNT_ID"
 }
 ```
+
 - **Success Response**: 201 Created
 
 #### GET /incomes - Lihat Semua Pemasukan
+
 - **Deskripsi**: Mengambil semua entri pemasukan untuk pengguna yang terautentikasi
 - **Autentikasi**: JWT Required
 - **Success Response**: 200 OK, `{ "incomes": [...] }`
 
 #### PUT /incomes/:incomeId - Update Pemasukan Berdasarkan ID
+
 - **Deskripsi**: Memperbarui detail pemasukan yang sudah ada dan menyesuaikan saldo
 - **Autentikasi**: JWT Required
 - **URL Params**: `:incomeId` (ID pemasukan)
 - **Request Body (JSON)**:
+
 ```json
 {
-  "amount": 550.00,
+  "amount": 550.0,
   "date": "2025-06-01T09:00:00Z",
   "description": "Pembayaran gaji (revisi)",
   "source": "Salary"
 }
 ```
+
 - **Success Response**: 200 OK
 
 #### DELETE /incomes/:incomeId - Hapus Pemasukan Berdasarkan ID
+
 - **Deskripsi**: Menghapus entri pemasukan dan menyesuaikan saldo
 - **Autentikasi**: JWT Required
 - **URL Params**: `:incomeId` (ID pemasukan)
@@ -183,61 +295,73 @@ Semua endpoint API Anda berada di bawah Base URL `https://fintrack-o1bw.vercel.a
 ### 5. Tujuan Tabungan (Saving Goals)
 
 #### POST /saving-goals - Buat Tujuan Tabungan Baru
+
 - **Deskripsi**: Membuat tujuan tabungan baru dengan target jumlah
 - **Autentikasi**: JWT Required
 - **Request Body (JSON)**:
+
 ```json
 {
   "name": "Beli Sepeda Baru",
-  "targetAmount": 1200000.00
+  "targetAmount": 1200000.0
 }
 ```
+
 - **Success Response**: 201 Created
 
 #### GET /saving-goals - Lihat Semua Tujuan Tabungan
+
 - **Deskripsi**: Mengambil semua tujuan tabungan yang dimiliki pengguna
 - **Autentikasi**: JWT Required
 - **Success Response**: 200 OK
 
 #### POST /saving-goals/:goalId/allocate - Alokasikan Dana ke Tujuan Tabungan
+
 - **Deskripsi**: Mengalokasikan sejumlah dana dari akun sumber spesifik ke tujuan tabungan
 - **Autentikasi**: JWT Required
 - **URL Params**: `:goalId` (ID tujuan tabungan)
 - **Request Body (JSON)**:
+
 ```json
 {
-  "amount": 500000.00,
+  "amount": 500000.0,
   "accountId": "YOUR_SOURCE_ACCOUNT_ID"
 }
 ```
+
 - **Success Response**: 200 OK
 - **Error**: 400 Bad Request ("Insufficient balance in source account..." atau "Allocation amount exceeds..." atau "Saving Goal is already completed.")
 
 ### 6. Transfer Antar Akun
 
 #### POST /transfers - Transfer Dana Antar Akun
+
 - **Deskripsi**: Melakukan transfer dana dari satu akun pengguna ke akun pengguna lainnya
 - **Autentikasi**: JWT Required
 - **Request Body (JSON)**:
+
 ```json
 {
   "sourceAccountId": "YOUR_SOURCE_ACCOUNT_ID",
   "destinationAccountId": "YOUR_DESTINATION_ACCOUNT_ID",
-  "amount": 150000.00,
+  "amount": 150000.0,
   "description": "Uang makan"
 }
 ```
+
 - **Success Response**: 200 OK
 - **Error**: 400 Bad Request ("Insufficient balance in source account..." atau "Source and destination accounts cannot be the same.")
 
 ### 7. Pengguna (Users)
 
 #### GET /users/balance - Lihat Saldo Total Pengguna
+
 - **Deskripsi**: Mengambil saldo total terkini pengguna (penjumlahan saldo dari semua akun)
 - **Autentikasi**: JWT Required
 - **Success Response**: 200 OK, `{ "currentBalance": 1234.56 }`
 
 #### GET /users/:userId - Lihat Detail Pengguna Berdasarkan ID
+
 - **Deskripsi**: Mengambil detail profil pengguna. Membutuhkan userId di URL yang harus cocok dengan userId dari token
 - **Autentikasi**: JWT Required
 - **URL Params**: `:userId` (ID pengguna)
@@ -246,6 +370,7 @@ Semua endpoint API Anda berada di bawah Base URL `https://fintrack-o1bw.vercel.a
 ### 8. Prediksi Pengeluaran
 
 #### POST /predict-expense - Prediksi Pengeluaran Bulanan
+
 - **Deskripsi**: Memicu prediksi pengeluaran untuk bulan berikutnya berdasarkan data historis 6 bulan terakhir dari pengguna yang terautentikasi. Hasil prediksi juga disimpan sebagai rekomendasi anggaran
 - **Autentikasi**: JWT Required
 - **Request Body (JSON)**: `{}` (body bisa kosong)
